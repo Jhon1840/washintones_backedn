@@ -1,0 +1,522 @@
+openapi: 3.0.3
+info:
+  title: Freddy CRM API
+  description: |
+    API documentada con Swagger/OpenAPI. Usa los tokens emitidos por `/api/auth/login`.
+    Estado actual: algunos controladores devuelven mensajes de "pendiente de implementación",
+    pero el contrato expuesto aquí describe el comportamiento esperado.
+  version: 0.1.0
+servers:
+  - url: http://localhost:8081
+    description: Servidor de desarrollo (`php artisan serve --host=0.0.0.0 --port=8081`)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ApiMessage:
+      type: object
+      properties:
+        message:
+          type: string
+      required: [message]
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+    AuthToken:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: bearer
+        expires_in:
+          type: integer
+          example: 3600
+        user:
+          $ref: '#/components/schemas/Usuario'
+      required: [access_token, token_type, expires_in, user]
+    Usuario:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        email:
+          type: string
+          format: email
+        telefono:
+          type: string
+        activo:
+          type: boolean
+      required: [id, nombre, email, telefono, activo]
+    Cliente:
+      type: object
+      properties:
+        id:
+          type: integer
+        nombre:
+          type: string
+        telefono:
+          type: string
+        email:
+          type: string
+          format: email
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required: [nombre, telefono, email]
+    Inmueble:
+      type: object
+      properties:
+        id:
+          type: integer
+        cliente_id:
+          type: integer
+        direccion:
+          type: string
+        descripcion:
+          type: string
+        tipo_id:
+          type: integer
+        zona_id:
+          type: integer
+        operacion_id:
+          type: integer
+        amc_estado_id:
+          type: integer
+        valor_estimado:
+          type: number
+          format: float
+        moneda_id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - cliente_id
+        - direccion
+        - descripcion
+        - tipo_id
+        - zona_id
+        - operacion_id
+        - amc_estado_id
+        - valor_estimado
+        - moneda_id
+paths:
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login para usuarios de negocio
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Sesión creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthToken'
+        '422':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+  /api/auth/me:
+    get:
+      security:
+        - bearerAuth: []
+      tags: [Auth]
+      summary: Información del usuario autenticado
+      responses:
+        '200':
+          description: Perfil actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Usuario'
+        '401':
+          description: Token inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+  /api/auth/refresh:
+    post:
+      security:
+        - bearerAuth: []
+      tags: [Auth]
+      summary: Refrescar token
+      responses:
+        '200':
+          description: Token renovado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthToken'
+        '401':
+          description: Token inválido o expirado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+  /api/auth/logout:
+    post:
+      security:
+        - bearerAuth: []
+      tags: [Auth]
+      summary: Cerrar sesión
+      responses:
+        '200':
+          description: Sesión cerrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+  /api/catalogos/tipos-inmueble:
+    get:
+      security:
+        - bearerAuth: []
+      tags: [Catalogos]
+      summary: Listado de tipos de inmueble
+      responses:
+        '200':
+          description: Lista de registros
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        nombre:
+                          type: string
+  /api/catalogos/zonas:
+    get:
+      security:
+        - bearerAuth: []
+      tags: [Catalogos]
+      summary: Zonas disponibles
+      responses:
+        '200':
+          description: Lista de zonas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        nombre:
+                          type: string
+  /api/clientes:
+    get:
+      security:
+        - bearerAuth: []
+      tags: [Clientes]
+      summary: Listar clientes
+      responses:
+        '200':
+          description: Colección de clientes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Cliente'
+    post:
+      security:
+        - bearerAuth: []
+      tags: [Clientes]
+      summary: Crear cliente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Cliente'
+      responses:
+        '201':
+          description: Cliente creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+  /api/clientes/{id}:
+    parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+    get:
+      security:
+        - bearerAuth: []
+      tags: [Clientes]
+      summary: Consultar cliente
+      responses:
+        '200':
+          description: Cliente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+    put:
+      security:
+        - bearerAuth: []
+      tags: [Clientes]
+      summary: Actualizar cliente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Cliente'
+      responses:
+        '200':
+          description: Cliente actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+    delete:
+      security:
+        - bearerAuth: []
+      tags: [Clientes]
+      summary: Eliminar cliente
+      responses:
+        '204':
+          description: Eliminado
+  /api/inmuebles:
+    get:
+      security:
+        - bearerAuth: []
+      tags: [Inmuebles]
+      summary: Listar inmuebles
+      parameters:
+        - in: query
+          name: cliente_id
+          schema:
+            type: integer
+        - in: query
+          name: zona_id
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Colección de inmuebles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Inmueble'
+    post:
+      security:
+        - bearerAuth: []
+      tags: [Inmuebles]
+      summary: Crear inmueble
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Inmueble'
+      responses:
+        '201':
+          description: Inmueble creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inmueble'
+  /api/inmuebles/{id}:
+    parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+    get:
+      security:
+        - bearerAuth: []
+      tags: [Inmuebles]
+      summary: Consultar inmueble
+      responses:
+        '200':
+          description: Inmueble
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Inmueble'
+    put:
+      security:
+        - bearerAuth: []
+      tags: [Inmuebles]
+      summary: Actualizar inmueble
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Inmueble'
+      responses:
+        '200':
+          description: Inmueble actualizado
+    delete:
+      security:
+        - bearerAuth: []
+      tags: [Inmuebles]
+      summary: Eliminar inmueble
+      responses:
+        '204':
+          description: Eliminado
+  /api/inmuebles/{id}/fotos:
+    post:
+      security:
+        - bearerAuth: []
+      tags: [Inmuebles]
+      summary: Agregar foto
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url:
+                  type: string
+                  format: uri
+                descripcion:
+                  type: string
+              required: [url]
+      responses:
+        '201':
+          description: Foto creada
+  /api/inmuebles/{id}/documentos:
+    post:
+      security:
+        - bearerAuth: []
+      tags: [Inmuebles]
+      summary: Agregar documento
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: integer
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tipo_documento_id:
+                  type: integer
+                url:
+                  type: string
+                  format: uri
+                descripcion:
+                  type: string
+              required: [tipo_documento_id, url]
+      responses:
+        '201':
+          description: Documento creado
+  /api/visitas/{id}/acciones:
+    get:
+      security:
+        - bearerAuth: []
+      tags: [Visitas]
+      summary: Acciones de la visita
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Lista de acciones
+    post:
+      security:
+        - bearerAuth: []
+      tags: [Visitas]
+      summary: Registrar acción
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                descripcion:
+                  type: string
+                fecha:
+                  type: string
+                  format: date-time
+    put:
+      security:
+        - bearerAuth: []
+      tags: [Visitas]
+      summary: Actualizar acción existente
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                descripcion:
+                  type: string
+                fecha:
+                  type: string
+                  format: date-time

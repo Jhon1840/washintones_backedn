@@ -14,5 +14,14 @@ class Usuario extends Model
         'telefono',
         'activo',
         'rol_id',
+        'password',
+    ];
+
+    protected $hidden = [
+        'password',
+    ];
+
+    protected $casts = [
+        'activo' => 'boolean',
     ];
 }

@@ -7,6 +7,13 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Documentacion del proyecto
+
+- **API Reference**: consulta `docs/API.md` para conocer rutas, payloads de ejemplo y el flujo de autenticacion (incluye usuarios sembrados y comandos utiles).
+- **Swagger/OpenAPI**: abre `docs/openapi.yaml` en [https://editor.swagger.io](https://editor.swagger.io) o ejecuta `docker run -p 8082:8080 -e SWAGGER_JSON=/docs/openapi.yaml -v %cd%/docs:/docs swaggerapi/swagger-ui` para ver la documentacion interactiva.
+- **Seeds demo**: ejecuta `php artisan migrate:fresh --seed` para cargar catalogos y data inicial antes de probar la API.
+- **Servidor local**: `php artisan serve --host=0.0.0.0 --port=8081` levanta la API en `http://localhost:8081`.
+
 ## About Laravel
 
 Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
