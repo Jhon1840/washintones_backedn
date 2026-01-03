@@ -14,4 +14,20 @@ class VisitaAccion extends Model
         'fecha',
         'descripcion',
     ];
+
+    protected $casts = [
+        'fecha' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    public function visita()
+    {
+        return $this->belongsTo(Visita::class);
+    }
+
+    public function usuario()
+    {
+        return $this->belongsTo(Usuario::class);
+    }
 }

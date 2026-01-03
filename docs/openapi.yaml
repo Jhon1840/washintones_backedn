@@ -59,7 +59,9 @@ components:
           type: string
         activo:
           type: boolean
-      required: [id, nombre, email, telefono, activo]
+        es_admin:
+          type: boolean
+      required: [id, nombre, email, telefono, activo, es_admin]
     Cliente:
       type: object
       properties:

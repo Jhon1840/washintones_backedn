@@ -4,18 +4,15 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 class DemoInmobiliariaSeeder extends Seeder
 {
     /**
-     * Seed de usuarios, clientes e inmuebles para pruebas manuales.
+     * Seed de clientes e inmuebles para pruebas manuales.
      */
     public function run(): void
     {
         $now = now();
-
-        $this->seedUsuarios($now);
 
         $clienteIds = $this->seedClientes($now);
 
@@ -53,38 +50,6 @@ class DemoInmobiliariaSeeder extends Seeder
 
         $this->seedInmuebleFotos($now, $inmuebleIds);
         $this->seedInmuebleDocumentos($now, $inmuebleIds, $catalogos['documentos']);
-    }
-
-    private function seedUsuarios($timestamp): void
-    {
-        $usuarios = [
-            [
-                'nombre' => 'Carla Ramirez',
-                'email' => 'carla.ramirez@freddy-demo.test',
-                'telefono' => '555-0101',
-                'password' => 'password',
-                'activo' => true,
-            ],
-            [
-                'nombre' => 'Luis Ortega',
-                'email' => 'luis.ortega@freddy-demo.test',
-                'telefono' => '555-0202',
-                'password' => 'password',
-                'activo' => true,
-            ],
-        ];
-
-        foreach ($usuarios as $usuario) {
-            DB::table('usuarios')->insert([
-                'nombre' => $usuario['nombre'],
-                'email' => $usuario['email'],
-                'telefono' => $usuario['telefono'],
-                'password' => Hash::make($usuario['password']),
-                'activo' => $usuario['activo'],
-                'created_at' => $timestamp,
-                'updated_at' => $timestamp,
-            ]);
-        }
     }
 
     private function seedClientes($timestamp): array

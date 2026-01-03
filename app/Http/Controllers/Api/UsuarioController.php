@@ -3,59 +3,143 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Usuario;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class UsuarioController extends Controller
 {
     public function index(): JsonResponse
     {
+        $usuarios = Usuario::query()
+            ->select(['id', 'nombre', 'email', 'telefono', 'activo', 'es_admin'])
+            ->orderBy('nombre')
+            ->get();
+
         return response()->json([
-            'message' => 'Listado de usuarios pendientes de implementación.',
-            'data' => [],
+            'message' => 'Usuarios recuperados.',
+            'data' => $usuarios,
         ]);
     }
 
     public function store(Request $request): JsonResponse
     {
+        $data = $this->validateData($request);
+        $usuario = Usuario::create([
+            'nombre' => $data['nombre'],
+            'email' => $data['email'],
+            'telefono' => $data['telefono'] ?? '',
+            'password' => Hash::make($data['password']),
+            'activo' => $data['activo'] ?? true,
+            'es_admin' => $this->resolveAdminFlag($data),
+        ]);
+
         return response()->json([
-            'message' => 'Crear usuario pendiente de implementación.',
-            'data' => $this->payload($request),
+            'message' => 'Usuario creado correctamente.',
+            'data' => $usuario->only(['id', 'nombre', 'email', 'telefono', 'activo', 'es_admin']),
         ], 201);
     }
 
     public function show(string $id): JsonResponse
     {
+        $usuario = Usuario::find($id);
+
+        if (! $usuario) {
+            return response()->json([
+                'message' => 'Usuario no encontrado.',
+            ], 404);
+        }
+
         return response()->json([
-            'message' => 'Detalle de usuario pendiente de implementación.',
-            'data' => ['id' => $id],
+            'message' => 'Detalle de usuario recuperado.',
+            'data' => $usuario->only(['id', 'nombre', 'email', 'telefono', 'activo', 'es_admin']),
         ]);
     }
 
     public function update(Request $request, string $id): JsonResponse
     {
+        $usuario = Usuario::find($id);
+
+        if (! $usuario) {
+            return response()->json([
+                'message' => 'Usuario no encontrado.',
+            ], 404);
+        }
+
+        $data = $this->validateData($request, $usuario->id, updating: true);
+        $usuario->fill([
+            'nombre' => $data['nombre'] ?? $usuario->nombre,
+            'email' => $data['email'] ?? $usuario->email,
+            'telefono' => $data['telefono'] ?? $usuario->telefono,
+            'activo' => $data['activo'] ?? $usuario->activo,
+            'es_admin' => array_key_exists('es_admin', $data)
+                ? (bool) $data['es_admin']
+                : $usuario->es_admin,
+        ]);
+
+        if (! empty($data['rol_id'])) {
+            $usuario->es_admin = $this->resolveAdminFlag($data) ?: $usuario->es_admin;
+        }
+
+        if (! empty($data['password'])) {
+            $usuario->password = Hash::make($data['password']);
+        }
+
+        $usuario->save();
+
         return response()->json([
-            'message' => 'Actualizar usuario pendiente de implementación.',
-            'data' => array_merge(['id' => $id], $this->payload($request)),
+            'message' => 'Usuario actualizado.',
+            'data' => $usuario->only(['id', 'nombre', 'email', 'telefono', 'activo', 'es_admin']),
         ]);
     }
 
     public function destroy(string $id): JsonResponse
     {
+        $usuario = Usuario::find($id);
+
+        if (! $usuario) {
+            return response()->json([
+                'message' => 'Usuario no encontrado.',
+            ], 404);
+        }
+
+        $usuario->delete();
+
         return response()->json([
-            'message' => 'Eliminar usuario pendiente de implementación.',
-            'data' => ['id' => $id],
+            'message' => 'Usuario eliminado.',
         ]);
     }
 
-    private function payload(Request $request): array
+    private function validateData(Request $request, ?int $usuarioId = null, bool $updating = false): array
     {
-        return $request->only([
-            'nombre',
-            'email',
-            'telefono',
-            'activo',
-            'rol_id',
+        $passwordRule = $updating ? ['nullable', 'string', 'min:6'] : ['required', 'string', 'min:6'];
+
+        return $request->validate([
+            'nombre' => [$updating ? 'sometimes' : 'required', 'string', 'max:255'],
+            'email' => [
+                $updating ? 'sometimes' : 'required',
+                'email',
+                'max:255',
+                Rule::unique('usuarios', 'email')->ignore($usuarioId),
+            ],
+            'telefono' => ['nullable', 'string', 'max:50'],
+            'password' => $passwordRule,
+            'activo' => ['nullable', 'boolean'],
+            'es_admin' => ['nullable', 'boolean'],
+            'rol_id' => ['nullable', 'string', 'max:50'],
         ]);
+    }
+
+    private function resolveAdminFlag(array $data): bool
+    {
+        if (array_key_exists('es_admin', $data)) {
+            return (bool) $data['es_admin'];
+        }
+
+        $rol = strtolower(trim((string) ($data['rol_id'] ?? '')));
+
+        return in_array($rol, ['admin', 'administrator', 'premium'], true);
     }
 }

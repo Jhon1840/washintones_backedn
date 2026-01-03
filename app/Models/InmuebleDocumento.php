@@ -6,12 +6,22 @@ use Illuminate\Database\Eloquent\Model;
 
 class InmuebleDocumento extends Model
 {
-    protected $table = 'inmueble_documentos';
+    protected $table = 'inmuebles_documentos';
 
     protected $fillable = [
         'inmueble_id',
+        'tipo_documento_id',
         'url',
-        'tipo',
         'descripcion',
     ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    public function inmueble()
+    {
+        return $this->belongsTo(Inmueble::class);
+    }
 }

@@ -6,10 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class Busqueda extends Model
 {
+    protected $table = 'busquedas_clientes';
+
     protected $fillable = [
         'cliente_id',
-        'usuario_id',
-        'estado',
-        'filtros',
+        'descripcion',
+        'operacion_id',
+        'tipo_inmueble_id',
+        'zona_id',
+        'presupuesto',
+        'moneda_id',
     ];
 }

@@ -7,10 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 class Interesado extends Model
 {
     protected $fillable = [
-        'cliente_id',
         'nombre',
-        'email',
         'telefono',
-        'estado',
+        'email',
+    ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 }

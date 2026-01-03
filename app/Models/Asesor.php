@@ -4,25 +4,20 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Usuario extends Model
+class Asesor extends Model
 {
-    protected $table = 'usuarios';
+    protected $table = 'asesores';
 
     protected $fillable = [
         'nombre',
-        'email',
         'telefono',
+        'email',
         'activo',
-        'password',
-        'es_admin',
-    ];
-
-    protected $hidden = [
-        'password',
     ];
 
     protected $casts = [
         'activo' => 'boolean',
-        'es_admin' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 }

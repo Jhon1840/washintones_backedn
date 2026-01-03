@@ -10,7 +10,15 @@ class Cliente extends Model
         'nombre',
         'email',
         'telefono',
-        'tipo',
-        'documento',
     ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    public function inmuebles()
+    {
+        return $this->hasMany(Inmueble::class);
+    }
 }

@@ -24,8 +24,6 @@ Route::prefix('auth')->group(function () {
     Route::get('me', [AuthController::class, 'me']);
 });
 
-Route::apiResource('usuarios', UsuarioController::class);
-
 Route::prefix('catalogos')->group(function () {
     Route::get('tipos-inmueble', [CatalogoController::class, 'tiposInmueble']);
     Route::get('zonas', [CatalogoController::class, 'zonas']);
@@ -75,3 +73,7 @@ Route::get('historial', [HistorialController::class, 'index']);
 Route::apiResource('tareas', TareaController::class)->only(['index', 'store', 'update']);
 
 Route::get('dashboard', [DashboardController::class, 'index']);
+
+Route::middleware('auth.admin')->group(function () {
+    Route::apiResource('usuarios', UsuarioController::class);
+});

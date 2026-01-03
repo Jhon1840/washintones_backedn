@@ -11,12 +11,13 @@ Esta es la guía rápida para consumir la API REST del proyecto. Toda la API viv
 
 ## Autenticacion
 
-Los usuarios de negocio viven en la tabla `usuarios`. El seed `DemoInmobiliariaSeeder` crea dos cuentas demo:
+Los usuarios de negocio viven en la tabla `usuarios`. El seed `UsuarioSeeder` crea cuentas demo listas para probar el panel de admin y el flujo normal:
 
-| Email | Password | Estado |
+| Email | Password | Rol |
 | --- | --- | --- |
-| `carla.ramirez@freddy-demo.test` | `password` | Activo |
-| `luis.ortega@freddy-demo.test` | `password` | Activo |
+| `admin@gmail.com` | `123456` | Admin (`es_admin: true`) |
+| `carla@gmail.com` | `123456` | Usuario activo con flujo completo |
+| `luis.ortega@freddy-demo.test` | `password` | Usuario activo |
 
 ### Login
 
@@ -25,8 +26,8 @@ POST /api/auth/login
 Content-Type: application/json
 
 {
-  "email": "carla.ramirez@freddy-demo.test",
-  "password": "password"
+  "email": "carla@gmail.com",
+  "password": "123456"
 }
 ```
 
@@ -40,8 +41,9 @@ Respuesta exitosa:
   "user": {
     "id": 1,
     "nombre": "Carla Ramirez",
-    "email": "carla.ramirez@freddy-demo.test",
-    "telefono": "555-0101"
+    "email": "carla@gmail.com",
+    "telefono": "555-0101",
+    "es_admin": false
   }
 }
 ```
@@ -77,7 +79,7 @@ GET /api/auth/me
 Authorization: Bearer {token}
 ```
 
-Devuelve los campos basicos (`id`, `nombre`, `email`, `telefono`, `activo`).
+Devuelve los campos basicos (`id`, `nombre`, `email`, `telefono`, `activo`, `es_admin`).
 
 ## Catologos
 
@@ -105,7 +107,11 @@ Cada recurso usa `Route::apiResource`, por lo que expone `index`, `store`, `show
 - `PUT/PATCH /api/usuarios/{id}`
 - `DELETE /api/usuarios/{id}`
 
-Campos esperados: `nombre`, `email`, `telefono`, `password`, `activo`, `rol_id`.
+ Campos esperados: `nombre`, `email`, `telefono`, `password`, `activo`, `es_admin`.
+ 
+ - Endpoints disponibles solo para administradores autenticados (`middleware: auth.admin`).
+ - Usa `es_admin: true` para los usuarios con rol administrativo y `false` para el resto.
+ - El seed `FlujoCompletoSeeder` enlaza a `carla@gmail.com` con clientes, captaciones, visitas, colocar e inmuebles captados para que exista un flujo end-to-end listo para probar.
 
 ### Clientes
 
