@@ -173,41 +173,109 @@ class CaptacionController extends Controller
     public function historial(string $id): JsonResponse
     {
         $captacion = Captacion::find($id);
+        $resolvedFromHistorial = false;
 
-        if (! $captacion) {
-            return response()->json([
-                'message' => 'Captación no encontrada.',
-            ], 404);
+        $timeline = collect();
+        $inmuebleId = $captacion?->inmueble_id;
+
+        if ($inmuebleId) {
+            $timeline = $this->timelineForInmueble((int) $inmuebleId);
         }
 
-        $timeline = DB::table('historial_acciones as ha')
+        if ($timeline->isEmpty()) {
+            $historial = DB::table('historial_acciones')
+                ->select(['id', 'inmueble_id'])
+                ->where('id', $id)
+                ->first();
+
+            if (! $historial) {
+                if (! $captacion) {
+                    return response()->json([
+                        'message' => 'Captación no encontrada.',
+                    ], 404);
+                }
+
+                return response()->json([
+                    'message' => 'Historial de captación recuperado.',
+                    'captacion_id' => (int) $captacion->id,
+                    'resuelto_desde_historial' => false,
+                    'data' => [],
+                ]);
+            }
+
+            $resolvedFromHistorial = true;
+            $inmuebleId = $historial->inmueble_id;
+            if (! $captacion) {
+                $captacion = Captacion::where('inmueble_id', $inmuebleId)->first();
+            }
+
+            $timeline = $this->timelineForInmueble((int) $inmuebleId);
+        }
+
+        return response()->json([
+            'message' => 'Historial de captación recuperado.',
+            'captacion_id' => $captacion ? (int) $captacion->id : null,
+            'resuelto_desde_historial' => $resolvedFromHistorial,
+            'data' => $timeline,
+        ]);
+    }
+
+    public function historialGlobal(Request $request): JsonResponse
+    {
+        $limit = (int) $request->query('limit', 200);
+        $limit = max(1, min($limit, 1000));
+
+        $timeline = $this->timelineBaseQuery()
+            ->join('captaciones as cap', 'cap.inmueble_id', '=', 'ha.inmueble_id')
+            ->select(array_merge(
+                $this->timelineSelectColumns(),
+                ['cap.id as captacion_id']
+            ))
+            ->orderByDesc('ha.fecha_accion')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'message' => 'Historial global de captaciones recuperado.',
+            'data' => $timeline,
+        ]);
+    }
+
+    private function timelineForInmueble(int $inmuebleId)
+    {
+        return $this->timelineBaseQuery()
+            ->select($this->timelineSelectColumns())
+            ->where('ha.inmueble_id', $inmuebleId)
+            ->orderByDesc('ha.fecha_accion')
+            ->get();
+    }
+
+    private function timelineBaseQuery()
+    {
+        return DB::table('historial_acciones as ha')
             ->join('clientes as c', 'c.id', '=', 'ha.cliente_id')
             ->join('inmuebles as i', 'i.id', '=', 'ha.inmueble_id')
             ->join('catalogo_etapas as ce', 'ce.id', '=', 'ha.etapa_id')
             ->join('catalogo_acciones as ca', 'ca.id', '=', 'ha.accion_id')
             ->leftJoin('interesados as interes', 'interes.id', '=', 'ha.interesado_id')
-            ->leftJoin('asesores as a', 'a.id', '=', 'ha.asesor_id')
-            ->select([
-                'ha.id',
-                'c.nombre as cliente',
-                'i.direccion as inmueble',
-                'ce.nombre as etapa',
-                'ca.nombre as accion',
-                'ha.notas',
-                'ha.fecha_accion',
-                'ha.fecha_proxima_accion',
-                'interes.nombre as interesado',
-                'a.nombre as asesor',
-            ])
-            ->where('ha.inmueble_id', $captacion->inmueble_id)
-            ->orderByDesc('ha.fecha_accion')
-            ->get();
+            ->leftJoin('asesores as a', 'a.id', '=', 'ha.asesor_id');
+    }
 
-        return response()->json([
-            'message' => 'Historial de captación recuperado.',
-            'captacion_id' => (int) $id,
-            'data' => $timeline,
-        ]);
+    private function timelineSelectColumns(): array
+    {
+        return [
+            'ha.id',
+            'ha.inmueble_id',
+            'c.nombre as cliente',
+            'i.direccion as inmueble',
+            'ce.nombre as etapa',
+            'ca.nombre as accion',
+            'ha.notas',
+            'ha.fecha_accion',
+            'ha.fecha_proxima_accion',
+            'interes.nombre as interesado',
+            'a.nombre as asesor',
+        ];
     }
 
     public function proximasAcciones(Request $request): JsonResponse
@@ -219,6 +287,7 @@ class CaptacionController extends Controller
             ->join('clientes as c', 'c.id', '=', 'ha.cliente_id')
             ->join('inmuebles as i', 'i.id', '=', 'ha.inmueble_id')
             ->join('catalogo_acciones as ca', 'ca.id', '=', 'ha.accion_id')
+            ->leftJoin('captaciones as cap', 'cap.inmueble_id', '=', 'ha.inmueble_id')
             ->select([
                 'ha.id',
                 'c.nombre as cliente',
@@ -226,6 +295,7 @@ class CaptacionController extends Controller
                 'ca.nombre as accion',
                 'ha.fecha_proxima_accion',
                 'ha.notas',
+                'cap.id as captacion_id',
             ])
             ->where('ha.usuario_id', $usuario->id)
             ->whereDate('ha.fecha_proxima_accion', '>=', now()->toDateString())
@@ -240,6 +310,7 @@ class CaptacionController extends Controller
                     'inmueble' => $row->inmueble,
                     'fecha' => $row->fecha_proxima_accion,
                     'notas' => $row->notas,
+                    'captacion_id' => $row->captacion_id,
                 ];
             });
 

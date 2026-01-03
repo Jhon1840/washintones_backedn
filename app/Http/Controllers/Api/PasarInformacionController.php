@@ -195,6 +195,34 @@ class PasarInformacionController extends Controller
         ]);
     }
 
+    public function historialGlobal(Request $request): JsonResponse
+    {
+        $limit = (int) $request->query('limit', 200);
+        $limit = max(1, min($limit, 1000));
+
+        $acciones = DB::table('historial_acciones as ha')
+            ->join('pasar_informacion as pi', 'pi.inmueble_id', '=', 'ha.inmueble_id')
+            ->join('clientes as c', 'c.id', '=', 'pi.cliente_id')
+            ->join('inmuebles as i', 'i.id', '=', 'pi.inmueble_id')
+            ->select([
+                'ha.id',
+                'pi.id as pasar_informacion_id',
+                'c.nombre as cliente',
+                'i.direccion as inmueble',
+                'ha.notas',
+                'ha.fecha_accion',
+                'ha.fecha_proxima_accion',
+            ])
+            ->orderByDesc('ha.fecha_accion')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'message' => 'Historial global recuperado.',
+            'data' => $acciones,
+        ]);
+    }
+
     private function requireUsuario(Request $request): Usuario
     {
         $usuario = $this->tokens->resolveUserFromRequest($request);

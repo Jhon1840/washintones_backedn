@@ -12,6 +12,7 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class VisitaController extends Controller
 {
@@ -172,6 +173,35 @@ class VisitaController extends Controller
         return response()->json([
             'message' => 'Visita actualizada.',
             'data' => $visita,
+        ]);
+    }
+
+    public function historialGlobal(Request $request): JsonResponse
+    {
+        $limit = (int) $request->query('limit', 200);
+        $limit = max(1, min($limit, 1000));
+
+        $acciones = DB::table('visita_acciones as va')
+            ->join('visitas as v', 'v.id', '=', 'va.visita_id')
+            ->join('clientes as c', 'c.id', '=', 'v.cliente_id')
+            ->join('inmuebles as i', 'i.id', '=', 'v.inmueble_id')
+            ->select([
+                'va.id',
+                'va.visita_id',
+                'va.descripcion',
+                'va.fecha',
+                'va.created_at',
+                'c.nombre as cliente',
+                'c.telefono as telefono',
+                'i.direccion as inmueble',
+            ])
+            ->orderByDesc('va.fecha')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'message' => 'Historial global de visitas recuperado.',
+            'data' => $acciones,
         ]);
     }
 

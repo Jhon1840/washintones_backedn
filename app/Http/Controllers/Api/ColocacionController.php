@@ -211,13 +211,7 @@ class ColocacionController extends Controller
             ], 404);
         }
 
-        $acciones = DB::table('historial_acciones as ha')
-            ->select([
-                'ha.id',
-                'ha.notas',
-                'ha.fecha_accion',
-                'ha.fecha_proxima_accion',
-            ])
+        $acciones = $this->accionesBaseQuery()
             ->where('ha.inmueble_id', $colocacion->inmueble_id)
             ->orderByDesc('ha.fecha_accion')
             ->get();
@@ -233,6 +227,49 @@ class ColocacionController extends Controller
                 'acciones' => $acciones,
             ],
         ]);
+    }
+
+    public function historialGlobal(Request $request): JsonResponse
+    {
+        $limit = (int) $request->query('limit', 200);
+        $limit = max(1, min($limit, 1000));
+
+        $acciones = $this->accionesBaseQuery()
+            ->join('colocaciones as col', 'col.inmueble_id', '=', 'ha.inmueble_id')
+            ->join('asesores as ase', 'ase.id', '=', 'col.asesor_id')
+            ->join('catalogo_estados_colocacion as est', 'est.id', '=', 'col.estado_id')
+            ->join('inmuebles as inm', 'inm.id', '=', 'ha.inmueble_id')
+            ->select([
+                'ha.id',
+                'col.id as colocacion_id',
+                'ha.notas',
+                'ha.fecha_accion',
+                'ha.fecha_proxima_accion',
+                'ase.nombre as asesor',
+                'est.nombre as estado',
+                'inm.direccion as inmueble',
+                'col.notas as colocacion_notas',
+            ])
+            ->orderByDesc('ha.fecha_accion')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'message' => 'Historial global de colocación recuperado.',
+            'data' => $acciones,
+        ]);
+    }
+
+    private function accionesBaseQuery()
+    {
+        return DB::table('historial_acciones as ha')
+            ->select([
+                'ha.id',
+                'ha.notas',
+                'ha.fecha_accion',
+                'ha.fecha_proxima_accion',
+                'ha.inmueble_id',
+            ]);
     }
 
     private function requireUsuario(Request $request): Usuario

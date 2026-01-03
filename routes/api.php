@@ -35,6 +35,7 @@ Route::prefix('catalogos')->group(function () {
 });
 
 Route::get('clientes/search', [ClienteController::class, 'search']);
+Route::get('clientes/{id}/relaciones', [ClienteController::class, 'relations']);
 Route::apiResource('clientes', ClienteController::class);
 
 Route::apiResource('inmuebles', InmuebleController::class);
@@ -43,6 +44,7 @@ Route::delete('inmuebles/fotos/{id}', [InmuebleController::class, 'destroyFoto']
 Route::post('inmuebles/{id}/documentos', [InmuebleController::class, 'storeDocumento']);
 Route::delete('inmuebles/documentos/{id}', [InmuebleController::class, 'destroyDocumento']);
 
+Route::get('captaciones/historial', [CaptacionController::class, 'historialGlobal']);
 Route::get('captaciones/proximas-acciones', [CaptacionController::class, 'proximasAcciones']);
 Route::get('captaciones/{id}/historial', [CaptacionController::class, 'historial']);
 Route::apiResource('captaciones', CaptacionController::class)->except(['destroy']);
@@ -54,17 +56,20 @@ Route::apiResource('busquedas', BusquedaController::class)->except(['destroy']);
 Route::post('busquedas/{id}/inmuebles', [BusquedaController::class, 'attachInmueble']);
 Route::delete('busquedas/inmuebles/{id}', [BusquedaController::class, 'detachInmueble']);
 
+Route::get('colocaciones/historial', [ColocacionController::class, 'historialGlobal']);
 Route::get('colocaciones/{id}/historial', [ColocacionController::class, 'historial']);
 Route::apiResource('colocaciones', ColocacionController::class)->except(['destroy']);
 
 Route::get('interesados/search', [InteresadoController::class, 'search']);
 Route::apiResource('interesados', InteresadoController::class)->except(['destroy']);
 
+Route::get('visitas/historial', [VisitaController::class, 'historialGlobal']);
 Route::get('visitas/{id}/acciones', [VisitaController::class, 'acciones']);
 Route::post('visitas/{id}/acciones', [VisitaController::class, 'storeAccion']);
 Route::put('visitas/acciones/{id}', [VisitaController::class, 'updateAccion']);
 Route::apiResource('visitas', VisitaController::class)->except(['destroy']);
 
+Route::get('pasar-informacion/historial', [PasarInformacionController::class, 'historialGlobal']);
 Route::get('pasar-informacion/{id}/historial', [PasarInformacionController::class, 'historial']);
 Route::apiResource('pasar-informacion', PasarInformacionController::class)->except(['destroy']);
 

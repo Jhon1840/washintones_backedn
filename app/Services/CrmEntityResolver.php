@@ -9,7 +9,7 @@ use App\Models\Cliente;
 use App\Models\Inmueble;
 use App\Models\Interesado;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades.DB;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class CrmEntityResolver
