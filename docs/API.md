@@ -121,8 +121,31 @@ Cada recurso usa `Route::apiResource`, por lo que expone `index`, `store`, `show
 - `PUT/PATCH /api/clientes/{id}`
 - `DELETE /api/clientes/{id}`
 - `GET /api/clientes/search?term=texto`
+- `GET /api/clientes/{id}/relaciones`
 
 Campos: `nombre`, `telefono`, `email`.
+
+El endpoint `relaciones` sirve para poblar los autocompletados móviles: devuelve los inmuebles ligados al cliente y los interesados/contactos más recientes que aparecen en `historial_acciones`. Ejemplo:
+
+```json
+{
+  "message": "Relaciones del cliente recuperadas.",
+  "cliente": {
+    "id": 4,
+    "nombre": "Residencial Aurora",
+    "telefono": "555-0199",
+    "email": "aurora@example.com"
+  },
+  "data": {
+    "inmuebles": [
+      { "id": 12, "nombre": "Calle Aurora 742, Centro", "descripcion": "Departamento modelo" }
+    ],
+    "contactos": [
+      { "id": 7, "nombre": "Luis Perez", "telefono": "777-1111", "ultima_accion": "2026-01-02" }
+    ]
+  }
+}
+```
 
 ### Inmuebles
 
@@ -160,6 +183,7 @@ Payload tipico:
 - `PUT/PATCH /api/captaciones/{id}`
 - `GET /api/captaciones/proximas-acciones`
 - `GET /api/captaciones/{id}/historial`
+- `GET /api/captaciones/historial`
 
 `destroy` esta deshabilitado (`except(['destroy'])`).
 
@@ -174,7 +198,10 @@ Payload tipico:
 
 ### Colocaciones
 
-`apiResource` sin `destroy`, mas `GET /api/colocaciones/{id}/historial`.
+`apiResource` sin `destroy`, mas:
+
+- `GET /api/colocaciones/{id}/historial`
+- `GET /api/colocaciones/historial`
 
 ### Interesados
 
@@ -186,10 +213,14 @@ Payload tipico:
 - `GET /api/visitas/{id}/acciones`
 - `POST /api/visitas/{id}/acciones`
 - `PUT /api/visitas/acciones/{id}`
+- `GET /api/visitas/historial`
 
 ### Pasar informacion
 
-`apiResource('pasar-informacion')->except(['destroy'])` y `GET /api/pasar-informacion/{id}/historial`.
+`apiResource('pasar-informacion')->except(['destroy'])` mas:
+
+- `GET /api/pasar-informacion/{id}/historial`
+- `GET /api/pasar-informacion/historial`
 
 ### Otros endpoints
 
