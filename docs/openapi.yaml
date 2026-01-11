@@ -121,6 +121,41 @@ components:
         - amc_estado_id
         - valor_estimado
         - moneda_id
+    AdminDashboardSeries:
+      type: object
+      properties:
+        fecha:
+          type: string
+          format: date
+        label:
+          type: string
+        total:
+          type: number
+          format: float
+      required: [label, total]
+    AdminDashboardStats:
+      type: object
+      properties:
+        total_usuarios:
+          type: integer
+        ganancias_mes:
+          type: number
+          format: float
+        ganancias_anio:
+          type: number
+          format: float
+        serie_semanal:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminDashboardSeries'
+        message:
+          type: string
+      required:
+        - total_usuarios
+        - ganancias_mes
+        - ganancias_anio
+        - serie_semanal
+        - message
 paths:
   /api/auth/login:
     post:
@@ -499,6 +534,36 @@ paths:
                 fecha:
                   type: string
                   format: date-time
+  /api/admin/dashboard:
+    get:
+      security:
+        - bearerAuth: []
+      tags: [Admin]
+      summary: Métricas del dashboard administrativo
+      description: |
+        Las ganancias se calculan con base en suscripciones activas (`estado: activa` y `fecha_fin` nula o futura).
+        `ganancias_mes` es la suma de `precio_mensual` de esas suscripciones.
+        `ganancias_anio` es `ganancias_mes * 12`.
+        La serie semanal suma `precio_mensual` por `fecha_inicio` en los últimos 7 días.
+      responses:
+        '200':
+          description: Resumen del panel admin
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDashboardStats'
+        '401':
+          description: Token inválido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
+        '403':
+          description: No autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiMessage'
     put:
       security:
         - bearerAuth: []

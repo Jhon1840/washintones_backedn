@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AdminDashboardController;
 use App\Http\Controllers\Api\BusquedaController;
 use App\Http\Controllers\Api\CaptacionController;
 use App\Http\Controllers\Api\CatalogoController;
@@ -12,6 +13,8 @@ use App\Http\Controllers\Api\InmuebleCaptadoController;
 use App\Http\Controllers\Api\InmuebleController;
 use App\Http\Controllers\Api\InteresadoController;
 use App\Http\Controllers\Api\PasarInformacionController;
+use App\Http\Controllers\Api\PlanController;
+use App\Http\Controllers\Api\SuscripcionController;
 use App\Http\Controllers\Api\TareaController;
 use App\Http\Controllers\Api\UsuarioController;
 use App\Http\Controllers\Api\VisitaController;
@@ -80,5 +83,9 @@ Route::apiResource('tareas', TareaController::class)->only(['index', 'store', 'u
 Route::get('dashboard', [DashboardController::class, 'index']);
 
 Route::middleware('auth.admin')->group(function () {
+    Route::get('admin/dashboard', [AdminDashboardController::class, 'index']);
+    Route::apiResource('planes', PlanController::class);
     Route::apiResource('usuarios', UsuarioController::class);
 });
+
+Route::apiResource('suscripciones', SuscripcionController::class);

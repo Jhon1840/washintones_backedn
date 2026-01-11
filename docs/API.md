@@ -113,6 +113,19 @@ Cada recurso usa `Route::apiResource`, por lo que expone `index`, `store`, `show
  - Usa `es_admin: true` para los usuarios con rol administrativo y `false` para el resto.
  - El seed `FlujoCompletoSeeder` enlaza a `carla@gmail.com` con clientes, captaciones, visitas, colocar e inmuebles captados para que exista un flujo end-to-end listo para probar.
 
+### Planes (solo admin)
+
+- `GET /api/planes`
+- `POST /api/planes`
+- `GET /api/planes/{id}`
+- `PUT/PATCH /api/planes/{id}`
+- `DELETE /api/planes/{id}`
+
+Campos: `nombre`, `duracion_dias` (dias de vigencia, puede ser `null` para planes ilimitados), `precio`, `activo`.
+
+- Endpoints disponibles solo para administradores autenticados (`middleware: auth.admin`).
+- Si no env¡as el campo `activo` al crear (`POST`), el plan se guarda por defecto como activo (`activo: true`).
+
 ### Clientes
 
 - `GET /api/clientes`
@@ -222,6 +235,20 @@ Payload tipico:
 - `GET /api/pasar-informacion/{id}/historial`
 - `GET /api/pasar-informacion/historial`
 
+### Suscripciones
+
+- `GET /api/suscripciones`
+- `POST /api/suscripciones`
+- `GET /api/suscripciones/{id}`
+- `PUT/PATCH /api/suscripciones/{id}`
+- `DELETE /api/suscripciones/{id}`
+
+Campos: `usuario_id`, `plan_id`, `estado`, `precio_mensual`, `fecha_inicio`, `fecha_fin`, `ultimo_pago`.
+
+- Al crear una suscripcion, si no env¡as el campo `estado`, se guarda por defecto como activa (`estado: "activa"`).
+- Si el plan asociado tiene `duracion_dias` distinto de `null`, el backend calcula siempre `precio_mensual` a partir del campo `precio` del plan y fija `fecha_fin = fecha_inicio + duracion_dias`.
+- Si el plan es ilimitado (`duracion_dias = null`), `fecha_fin` queda en `null` y debes indicar `precio_mensual` al crear (o actualizar) la suscripcion; de lo contrario se devuelve un error de validacion (`422`).
+
 ### Otros endpoints
 
 - `GET /api/inmuebles-captados`
@@ -232,6 +259,42 @@ Payload tipico:
 - `GET /api/historial`
 - `apiResource('tareas')->only(['index','store','update'])`
 - `GET /api/dashboard`
+- `GET /api/admin/dashboard` (solo admin)
+
+### Dashboard admin
+
+Requiere autenticación con usuario admin (`middleware: auth.admin`).
+
+```
+GET /api/admin/dashboard
+Authorization: Bearer {token}
+```
+
+Notas:
+- Las ganancias se calculan con base en `suscripciones` activas (`estado: activa` y `fecha_fin` nula o en el futuro).
+- `ganancias_mes` es la suma de `precio_mensual` de las suscripciones activas.
+- `ganancias_anio` es `ganancias_mes * 12`.
+- La serie semanal suma `precio_mensual` por `fecha_inicio` en los últimos 7 días.
+
+Respuesta ejemplo:
+
+```json
+{
+  "total_usuarios": 12,
+  "ganancias_mes": 3500000,
+  "ganancias_anio": 14250000,
+  "serie_semanal": [
+    { "fecha": "2026-01-06", "label": "L", "total": 0 },
+    { "fecha": "2026-01-07", "label": "M", "total": 1200000 },
+    { "fecha": "2026-01-08", "label": "M", "total": 0 },
+    { "fecha": "2026-01-09", "label": "J", "total": 850000 },
+    { "fecha": "2026-01-10", "label": "V", "total": 0 },
+    { "fecha": "2026-01-11", "label": "S", "total": 600000 },
+    { "fecha": "2026-01-12", "label": "D", "total": 0 }
+  ],
+  "message": "Dashboard admin actualizado."
+}
+```
 
 ## Ejemplos de integracion rapida
 
@@ -269,6 +332,34 @@ curl -H "Authorization: Bearer $TOKEN" \
   http://localhost:8081/api/catalogos/tipos-inmueble
 ```
 
-## Nota sobre implementaciones pendientes
+### Crear plan y suscripcion
 
-Varios controladores actualmente devuelven mensajes de "pendiente de implementacion". La documentacion anterior describe el contrato esperado para cuando se complete cada recurso. Para pruebas rapidas usa los datos de seed y los endpoints ya implementados (`auth`, `usuarios`, etc.), luego extiende los controladores restantes siguiendo el mismo patron.
+Plan de pagos mensual activo por defecto:
+
+```bash
+curl -X POST http://localhost:8081/api/planes \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "Plan Mensual Básico",
+    "duracion_dias": 30,
+    "precio": 1200000
+  }'
+```
+
+Como no se env¡a `activo`, el plan se crea con `activo: true`.
+
+Suscripcion activa por defecto usando ese plan:
+
+```bash
+curl -X POST http://localhost:8081/api/suscripciones \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "usuario_id": 2,
+    "plan_id": 1,
+    "fecha_inicio": "2026-01-10"
+  }'
+```
+
+Al no enviar `estado`, la suscripcion se guarda con `estado: "activa"`. Para planes con `duracion_dias` definido, el backend toma `precio_mensual` desde el `precio` del plan y calcula `fecha_fin` sumando los dias de duracion a `fecha_inicio`.

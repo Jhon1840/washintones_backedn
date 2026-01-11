@@ -4,26 +4,23 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Usuario extends Model
+class Plan extends Model
 {
-    protected $table = 'usuarios';
+    protected $table = 'planes';
 
     protected $fillable = [
         'nombre',
-        'email',
-        'telefono',
+        'duracion_dias',
+        'precio',
         'activo',
-        'password',
-        'es_admin',
-    ];
-
-    protected $hidden = [
-        'password',
     ];
 
     protected $casts = [
+        'duracion_dias' => 'integer',
+        'precio' => 'decimal:2',
         'activo' => 'boolean',
-        'es_admin' => 'boolean',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function suscripciones()
