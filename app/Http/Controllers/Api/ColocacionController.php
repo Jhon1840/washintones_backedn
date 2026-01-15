@@ -72,7 +72,8 @@ class ColocacionController extends Controller
         $cliente = $this->resolver->resolveCliente(
             $data['cliente_nombre'],
             $data['telefono'] ?? null,
-            $data['correo'] ?? null
+            $data['correo'] ?? null,
+            $usuario->id
         );
 
         $direccion = $data['inmueble_sugerido'] ?? ('Oportunidad ' . $cliente->nombre);
@@ -201,8 +202,9 @@ class ColocacionController extends Controller
         ]);
     }
 
-    public function historial(string $id): JsonResponse
+    public function historial(Request $request, string $id): JsonResponse
     {
+        $usuario = $this->requireUsuario($request);
         $colocacion = Colocacion::with(['inmueble', 'asesor'])->find($id);
 
         if (! $colocacion) {
@@ -211,7 +213,18 @@ class ColocacionController extends Controller
             ], 404);
         }
 
-        $acciones = $this->accionesBaseQuery()
+        $tieneAcceso = DB::table('historial_acciones')
+            ->where('inmueble_id', $colocacion->inmueble_id)
+            ->where('usuario_id', $usuario->id)
+            ->exists();
+
+        if (! $tieneAcceso) {
+            return response()->json([
+                'message' => 'Colocación no encontrada.',
+            ], 404);
+        }
+
+        $acciones = $this->accionesBaseQuery($usuario->id)
             ->where('ha.inmueble_id', $colocacion->inmueble_id)
             ->orderByDesc('ha.fecha_accion')
             ->get();
@@ -231,10 +244,11 @@ class ColocacionController extends Controller
 
     public function historialGlobal(Request $request): JsonResponse
     {
+        $usuario = $this->requireUsuario($request);
         $limit = (int) $request->query('limit', 200);
         $limit = max(1, min($limit, 1000));
 
-        $acciones = $this->accionesBaseQuery()
+        $acciones = $this->accionesBaseQuery($usuario->id)
             ->join('colocaciones as col', 'col.inmueble_id', '=', 'ha.inmueble_id')
             ->join('asesores as ase', 'ase.id', '=', 'col.asesor_id')
             ->join('catalogo_estados_colocacion as est', 'est.id', '=', 'col.estado_id')
@@ -260,9 +274,9 @@ class ColocacionController extends Controller
         ]);
     }
 
-    private function accionesBaseQuery()
+    private function accionesBaseQuery(?int $usuarioId = null)
     {
-        return DB::table('historial_acciones as ha')
+        $query = DB::table('historial_acciones as ha')
             ->select([
                 'ha.id',
                 'ha.notas',
@@ -270,6 +284,12 @@ class ColocacionController extends Controller
                 'ha.fecha_proxima_accion',
                 'ha.inmueble_id',
             ]);
+
+        if ($usuarioId !== null) {
+            $query->where('ha.usuario_id', $usuarioId);
+        }
+
+        return $query;
     }
 
     private function requireUsuario(Request $request): Usuario

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Cliente extends Model
 {
     protected $fillable = [
+        'usuario_id',
         'nombre',
         'email',
         'telefono',
@@ -20,5 +21,10 @@ class Cliente extends Model
     public function inmuebles()
     {
         return $this->hasMany(Inmueble::class);
+    }
+
+    public function usuario()
+    {
+        return $this->belongsTo(Usuario::class, 'usuario_id');
     }
 }

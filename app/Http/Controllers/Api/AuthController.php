@@ -74,6 +74,35 @@ class AuthController extends Controller
             'nombre' => $usuario->nombre,
             'email' => $usuario->email,
             'telefono' => $usuario->telefono,
+            'foto_url' => $usuario->foto_url,
+            'activo' => (bool) $usuario->activo,
+            'es_admin' => (bool) $usuario->es_admin,
+        ]);
+    }
+
+    public function updatePhotoUrl(Request $request): JsonResponse
+    {
+        $usuario = $this->tokens->resolveUserFromRequest($request);
+
+        if (! $usuario) {
+            return response()->json([
+                'message' => 'Token invalido o expirado.',
+            ], 401);
+        }
+
+        $data = $request->validate([
+            'foto_url' => ['required', 'string', 'max:2048'],
+        ]);
+
+        $usuario->foto_url = $data['foto_url'];
+        $usuario->save();
+
+        return response()->json([
+            'id' => $usuario->id,
+            'nombre' => $usuario->nombre,
+            'email' => $usuario->email,
+            'telefono' => $usuario->telefono,
+            'foto_url' => $usuario->foto_url,
             'activo' => (bool) $usuario->activo,
             'es_admin' => (bool) $usuario->es_admin,
         ]);
@@ -92,6 +121,7 @@ class AuthController extends Controller
                 'nombre' => $usuario->nombre,
                 'email' => $usuario->email,
                 'telefono' => $usuario->telefono,
+                'foto_url' => $usuario->foto_url,
                 'es_admin' => (bool) $usuario->es_admin,
             ],
         ];

@@ -67,7 +67,8 @@ class VisitaController extends Controller
         $cliente = $this->resolver->resolveCliente(
             $data['cliente_nombre'],
             $data['telefono'] ?? null,
-            null
+            null,
+            $usuario->id
         );
 
         $inmueble = $this->resolver->resolveInmueble(
@@ -178,6 +179,7 @@ class VisitaController extends Controller
 
     public function historialGlobal(Request $request): JsonResponse
     {
+        $usuario = $this->requireUsuario($request);
         $limit = (int) $request->query('limit', 200);
         $limit = max(1, min($limit, 1000));
 
@@ -195,6 +197,7 @@ class VisitaController extends Controller
                 'c.telefono as telefono',
                 'i.direccion as inmueble',
             ])
+            ->where('va.usuario_id', $usuario->id)
             ->orderByDesc('va.fecha')
             ->limit($limit)
             ->get();
@@ -205,8 +208,9 @@ class VisitaController extends Controller
         ]);
     }
 
-    public function acciones(string $id): JsonResponse
+    public function acciones(Request $request, string $id): JsonResponse
     {
+        $usuario = $this->requireUsuario($request);
         $visita = Visita::find($id);
 
         if (! $visita) {
@@ -216,6 +220,7 @@ class VisitaController extends Controller
         }
 
         $acciones = VisitaAccion::where('visita_id', $visita->id)
+            ->where('usuario_id', $usuario->id)
             ->orderByDesc('fecha')
             ->get();
 

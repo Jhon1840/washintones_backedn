@@ -3,14 +3,22 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Usuario;
+use App\Services\AuthTokenService;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class HistorialController extends Controller
 {
+    public function __construct(private readonly AuthTokenService $tokens)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
+        $usuario = $this->requireUsuario($request);
         $limit = (int) $request->query('limit', 200);
         $limit = max(1, min($limit, 1000));
 
@@ -18,7 +26,6 @@ class HistorialController extends Controller
             'entidad',
             'cliente_id',
             'inmueble_id',
-            'usuario_id',
             'fecha_inicio',
             'fecha_fin',
         ]);
@@ -66,9 +73,7 @@ class HistorialController extends Controller
             $query->where('ha.inmueble_id', (int) $filters['inmueble_id']);
         }
 
-        if (! empty($filters['usuario_id'])) {
-            $query->where('ha.usuario_id', (int) $filters['usuario_id']);
-        }
+        $query->where('ha.usuario_id', $usuario->id);
 
         if (! empty($filters['fecha_inicio'])) {
             $query->whereDate('ha.fecha_accion', '>=', $filters['fecha_inicio']);
@@ -102,9 +107,21 @@ class HistorialController extends Controller
 
         return response()->json([
             'message' => 'Historial unificado recuperado.',
-            'filtros' => $filters,
+            'filtros' => array_merge($filters, ['usuario_id' => $usuario->id]),
             'data' => $timeline,
         ]);
     }
-}
 
+    private function requireUsuario(Request $request): Usuario
+    {
+        $usuario = $this->tokens->resolveUserFromRequest($request);
+
+        if (! $usuario) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Token invalido o expirado.',
+            ], 401));
+        }
+
+        return $usuario;
+    }
+}

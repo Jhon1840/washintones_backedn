@@ -4,19 +4,28 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Cliente;
+use App\Models\Usuario;
+use App\Services\AuthTokenService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ClienteController extends Controller
 {
+    public function __construct(private readonly AuthTokenService $tokens)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         $limit = max((int) $request->query('limit', 50), 1);
+        $usuario = $this->requireUsuario($request);
 
         $clientes = Cliente::query()
             ->select(['id', 'nombre', 'telefono', 'email', 'created_at'])
+            ->where('usuario_id', $usuario->id)
             ->orderBy('nombre')
             ->limit($limit)
             ->get();
@@ -29,7 +38,9 @@ class ClienteController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $data = $this->validateData($request);
+        $usuario = $this->requireUsuario($request);
+        $data = $this->validateData($request, null, $usuario->id);
+        $data['usuario_id'] = $usuario->id;
         $cliente = Cliente::create($data);
 
         return response()->json([
@@ -38,9 +49,10 @@ class ClienteController extends Controller
         ], 201);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $cliente = Cliente::find($id);
+        $usuario = $this->requireUsuario($request);
+        $cliente = Cliente::where('usuario_id', $usuario->id)->find($id);
 
         if (! $cliente) {
             return response()->json([
@@ -56,7 +68,8 @@ class ClienteController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
-        $cliente = Cliente::find($id);
+        $usuario = $this->requireUsuario($request);
+        $cliente = Cliente::where('usuario_id', $usuario->id)->find($id);
 
         if (! $cliente) {
             return response()->json([
@@ -64,7 +77,7 @@ class ClienteController extends Controller
             ], 404);
         }
 
-        $data = $this->validateData($request, $cliente->id);
+        $data = $this->validateData($request, $cliente->id, $usuario->id);
         $cliente->fill($data)->save();
 
         return response()->json([
@@ -73,9 +86,10 @@ class ClienteController extends Controller
         ]);
     }
 
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
-        $cliente = Cliente::find($id);
+        $usuario = $this->requireUsuario($request);
+        $cliente = Cliente::where('usuario_id', $usuario->id)->find($id);
 
         if (! $cliente) {
             return response()->json([
@@ -93,6 +107,7 @@ class ClienteController extends Controller
     public function search(Request $request): JsonResponse
     {
         $term = trim((string) ($request->query('term') ?? $request->query('q') ?? ''));
+        $usuario = $this->requireUsuario($request);
 
         if ($term === '') {
             return response()->json([
@@ -103,6 +118,7 @@ class ClienteController extends Controller
 
         $clientes = Cliente::query()
             ->select(['id', 'nombre', 'telefono', 'email'])
+            ->where('usuario_id', $usuario->id)
             ->where(function ($query) use ($term) {
                 $query->where('nombre', 'like', '%' . $term . '%')
                     ->orWhere('email', 'like', '%' . $term . '%')
@@ -118,9 +134,10 @@ class ClienteController extends Controller
         ]);
     }
 
-    public function relations(string $id): JsonResponse
+    public function relations(Request $request, string $id): JsonResponse
     {
-        $cliente = Cliente::find($id);
+        $usuario = $this->requireUsuario($request);
+        $cliente = Cliente::where('usuario_id', $usuario->id)->find($id);
 
         if (! $cliente) {
             return response()->json([
@@ -183,8 +200,15 @@ class ClienteController extends Controller
         ]);
     }
 
-    private function validateData(Request $request, ?int $clienteId = null): array
+    private function validateData(Request $request, ?int $clienteId = null, ?int $usuarioId = null): array
     {
+        $emailRule = Rule::unique('clientes', 'email')->ignore($clienteId);
+        if ($usuarioId !== null) {
+            $emailRule = $emailRule->where(function ($query) use ($usuarioId) {
+                return $query->where('usuario_id', $usuarioId);
+            });
+        }
+
         return $request->validate([
             'nombre' => ['required', 'string', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
@@ -192,8 +216,21 @@ class ClienteController extends Controller
                 'nullable',
                 'email',
                 'max:255',
-                Rule::unique('clientes', 'email')->ignore($clienteId),
+                $emailRule,
             ],
         ]);
+    }
+
+    private function requireUsuario(Request $request): Usuario
+    {
+        $usuario = $this->tokens->resolveUserFromRequest($request);
+
+        if (! $usuario) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Token invalido o expirado.',
+            ], 401));
+        }
+
+        return $usuario;
     }
 }

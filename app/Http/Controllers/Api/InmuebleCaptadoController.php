@@ -63,7 +63,8 @@ class InmuebleCaptadoController extends Controller
         $cliente = $this->resolver->resolveCliente(
             $data['cliente_nombre'] ?? 'Cliente sin nombre',
             null,
-            null
+            null,
+            $usuario->id
         );
 
         $inmueble = $this->resolver->resolveInmueble($data['inmueble_nombre'], $cliente, [
@@ -153,11 +154,19 @@ class InmuebleCaptadoController extends Controller
         ]);
     }
 
-    public function historial(string $id): JsonResponse
+    public function historial(Request $request, string $id): JsonResponse
     {
+        $usuario = $this->requireUsuario($request);
         $captado = InmuebleCaptado::with('inmueble')->find($id);
 
         if (! $captado) {
+            return response()->json([
+                'message' => 'Inmueble captado no encontrado.',
+            ], 404);
+        }
+
+        $captacion = Captacion::find($captado->captacion_id);
+        if ($captacion && $captacion->usuario_id !== $usuario->id) {
             return response()->json([
                 'message' => 'Inmueble captado no encontrado.',
             ], 404);
@@ -171,8 +180,15 @@ class InmuebleCaptadoController extends Controller
                 'ha.fecha_proxima_accion',
             ])
             ->where('ha.inmueble_id', $captado->inmueble_id)
+            ->where('ha.usuario_id', $usuario->id)
             ->orderByDesc('ha.fecha_accion')
             ->get();
+
+        if ($acciones->isEmpty()) {
+            return response()->json([
+                'message' => 'Inmueble captado no encontrado.',
+            ], 404);
+        }
 
         return response()->json([
             'message' => 'Historial de inmueble captado recuperado.',
@@ -182,6 +198,36 @@ class InmuebleCaptadoController extends Controller
                 'estado' => $captado->estado,
                 'acciones' => $acciones,
             ],
+        ]);
+    }
+
+    public function historialGlobal(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $limit = (int) $request->query('limit', 200);
+        $limit = max(1, min($limit, 1000));
+
+        $acciones = DB::table('historial_acciones as ha')
+            ->join('inmuebles as i', 'i.id', '=', 'ha.inmueble_id')
+            ->join('inmuebles_captados as ic', 'ic.inmueble_id', '=', 'ha.inmueble_id')
+            ->leftJoin('captaciones as cap', 'cap.id', '=', 'ic.captacion_id')
+            ->select([
+                'ha.id',
+                'i.direccion as inmueble',
+                'ic.estado',
+                'ha.notas',
+                'ha.fecha_accion',
+                'ha.fecha_proxima_accion',
+                'cap.id as captacion_id',
+            ])
+            ->where('ha.usuario_id', $usuario->id)
+            ->orderByDesc('ha.fecha_accion')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'message' => 'Historial global de inmuebles captados recuperado.',
+            'data' => $acciones,
         ]);
     }
 

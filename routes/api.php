@@ -25,6 +25,7 @@ Route::prefix('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout']);
     Route::post('refresh', [AuthController::class, 'refresh']);
     Route::get('me', [AuthController::class, 'me']);
+    Route::post('profile/photo-url', [AuthController::class, 'updatePhotoUrl']);
 });
 
 Route::prefix('catalogos')->group(function () {
@@ -53,6 +54,7 @@ Route::get('captaciones/{id}/historial', [CaptacionController::class, 'historial
 Route::apiResource('captaciones', CaptacionController::class)->except(['destroy']);
 
 Route::get('inmuebles-captados/{id}/historial', [InmuebleCaptadoController::class, 'historial']);
+Route::get('inmuebles-captados/historial', [InmuebleCaptadoController::class, 'historialGlobal']);
 Route::apiResource('inmuebles-captados', InmuebleCaptadoController::class)->except(['destroy']);
 
 Route::apiResource('busquedas', BusquedaController::class)->except(['destroy']);

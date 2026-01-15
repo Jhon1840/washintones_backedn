@@ -14,25 +14,36 @@ use Illuminate\Support\Str;
 
 class CrmEntityResolver
 {
-    public function resolveCliente(string $nombre, ?string $telefono = null, ?string $email = null): Cliente
+    public function resolveCliente(
+        string $nombre,
+        ?string $telefono = null,
+        ?string $email = null,
+        ?int $usuarioId = null
+    ): Cliente
     {
         $nombre = trim($nombre);
+        $baseQuery = Cliente::query();
+
+        if ($usuarioId !== null) {
+            $baseQuery->where('usuario_id', $usuarioId);
+        }
 
         if ($email) {
-            $cliente = Cliente::where('email', $email)->first();
+            $cliente = (clone $baseQuery)->where('email', $email)->first();
             if ($cliente) {
                 return $this->syncClienteData($cliente, $telefono, $email);
             }
         }
 
         if ($nombre !== '') {
-            $cliente = Cliente::where('nombre', $nombre)->first();
+            $cliente = (clone $baseQuery)->where('nombre', $nombre)->first();
             if ($cliente) {
                 return $this->syncClienteData($cliente, $telefono, $email);
             }
         }
 
         return Cliente::create([
+            'usuario_id' => $usuarioId,
             'nombre' => $nombre !== '' ? $nombre : 'Cliente app ' . now()->format('YmdHis'),
             'telefono' => $telefono ?: '000-0000',
             'email' => $email ?: $this->placeholderEmail($nombre),

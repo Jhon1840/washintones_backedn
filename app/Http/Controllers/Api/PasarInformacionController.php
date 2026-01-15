@@ -65,7 +65,8 @@ class PasarInformacionController extends Controller
         $cliente = $this->resolver->resolveCliente(
             $data['cliente_nombre'],
             $data['telefono'] ?? null,
-            null
+            null,
+            $usuario->id
         );
 
         $inmueble = $this->resolver->resolveInmueble(
@@ -162,11 +163,12 @@ class PasarInformacionController extends Controller
         ]);
     }
 
-    public function historial(string $id): JsonResponse
+    public function historial(Request $request, string $id): JsonResponse
     {
+        $usuario = $this->requireUsuario($request);
         $registro = PasarInformacion::with(['cliente', 'inmueble'])->find($id);
 
-        if (! $registro) {
+        if (! $registro || $registro->usuario_id !== $usuario->id) {
             return response()->json([
                 'message' => 'Registro no encontrado.',
             ], 404);
@@ -180,6 +182,7 @@ class PasarInformacionController extends Controller
                 'ha.fecha_proxima_accion',
             ])
             ->where('ha.inmueble_id', $registro->inmueble_id)
+            ->where('ha.usuario_id', $usuario->id)
             ->orderByDesc('ha.fecha_accion')
             ->get();
 
@@ -197,6 +200,7 @@ class PasarInformacionController extends Controller
 
     public function historialGlobal(Request $request): JsonResponse
     {
+        $usuario = $this->requireUsuario($request);
         $limit = (int) $request->query('limit', 200);
         $limit = max(1, min($limit, 1000));
 
@@ -213,6 +217,7 @@ class PasarInformacionController extends Controller
                 'ha.fecha_accion',
                 'ha.fecha_proxima_accion',
             ])
+            ->where('ha.usuario_id', $usuario->id)
             ->orderByDesc('ha.fecha_accion')
             ->limit($limit)
             ->get();

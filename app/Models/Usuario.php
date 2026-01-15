@@ -12,6 +12,7 @@ class Usuario extends Model
         'nombre',
         'email',
         'telefono',
+        'foto_url',
         'activo',
         'password',
         'es_admin',

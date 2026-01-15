@@ -47,6 +47,14 @@ class UsuarioSeeder extends Seeder
                 'es_admin' => false,
             ],
             [
+                'nombre' => 'Flujo Demo',
+                'email' => 'flujo@demo.test',
+                'telefono' => '555-0505',
+                'password' => 'demo123',
+                'activo' => true,
+                'es_admin' => false,
+            ],
+            [
                 'nombre' => 'Andres Pineda',
                 'email' => 'andres.pineda@freddy-demo.test',
                 'telefono' => '555-0404',

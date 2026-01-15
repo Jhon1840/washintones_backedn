@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             SuscripcionesSeeder::class,
             DemoInmobiliariaSeeder::class,
             FlujoCompletoSeeder::class,
+            FlujoUsuarioSeeder::class,
         ]);
 
         User::factory()->create([
