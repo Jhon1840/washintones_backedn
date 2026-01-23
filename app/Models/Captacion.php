@@ -9,7 +9,7 @@ class Captacion extends Model
     protected $table = 'captaciones';
 
     protected $fillable = [
-        'inmueble_id',
+        'cliente_id',
         'usuario_id',
         'estado',
         'fecha_inicio',
@@ -24,9 +24,9 @@ class Captacion extends Model
         'updated_at' => 'datetime',
     ];
 
-    public function inmueble()
+    public function cliente()
     {
-        return $this->belongsTo(Inmueble::class);
+        return $this->belongsTo(Cliente::class);
     }
 
     public function usuario()

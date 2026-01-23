@@ -54,7 +54,7 @@ class FlujoUsuarioSeeder extends Seeder
         ]);
 
         $captacionId = $this->firstOrCreate('captaciones', [
-            'inmueble_id' => $inmuebleId,
+            'cliente_id' => $clienteId,
             'usuario_id' => $usuario->id,
         ], [
             'estado' => 'En proceso',

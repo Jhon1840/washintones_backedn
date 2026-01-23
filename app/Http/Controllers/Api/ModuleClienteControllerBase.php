@@ -3,24 +3,25 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Cliente;
-use App\Models\Inmueble;
 use App\Models\Usuario;
 use App\Services\AuthTokenService;
-use App\Services\CrmEntityResolver;
-use Illuminate\Http\JsonResponse;
+use App\Services\ModuleEntityResolver;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
-class ClienteController extends Controller
+abstract class ModuleClienteControllerBase extends Controller
 {
+    protected string $clientesTable;
+    protected string $inmueblesTable;
+    protected string $historialTable;
+
     public function __construct(
-        private readonly AuthTokenService $tokens,
-        private readonly CrmEntityResolver $resolver
-    )
-    {
+        protected readonly AuthTokenService $tokens,
+        protected readonly ModuleEntityResolver $resolver
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -28,7 +29,7 @@ class ClienteController extends Controller
         $limit = max((int) $request->query('limit', 50), 1);
         $usuario = $this->requireUsuario($request);
 
-        $clientes = Cliente::query()
+        $clientes = DB::table($this->clientesTable)
             ->select(['id', 'nombre', 'telefono', 'email', 'created_at'])
             ->where('usuario_id', $usuario->id)
             ->orderBy('nombre')
@@ -45,8 +46,17 @@ class ClienteController extends Controller
     {
         $usuario = $this->requireUsuario($request);
         $data = $this->validateData($request, null, $usuario->id);
-        $data['usuario_id'] = $usuario->id;
-        $cliente = Cliente::create($data);
+
+        $id = DB::table($this->clientesTable)->insertGetId([
+            'usuario_id' => $usuario->id,
+            'nombre' => $data['nombre'],
+            'telefono' => $data['telefono'] ?? null,
+            'email' => $data['email'] ?? null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $cliente = DB::table($this->clientesTable)->where('id', $id)->first();
 
         return response()->json([
             'message' => 'Cliente creado correctamente.',
@@ -57,7 +67,10 @@ class ClienteController extends Controller
     public function show(Request $request, string $id): JsonResponse
     {
         $usuario = $this->requireUsuario($request);
-        $cliente = Cliente::where('usuario_id', $usuario->id)->find($id);
+        $cliente = DB::table($this->clientesTable)
+            ->where('usuario_id', $usuario->id)
+            ->where('id', $id)
+            ->first();
 
         if (! $cliente) {
             return response()->json([
@@ -74,7 +87,10 @@ class ClienteController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $usuario = $this->requireUsuario($request);
-        $cliente = Cliente::where('usuario_id', $usuario->id)->find($id);
+        $cliente = DB::table($this->clientesTable)
+            ->where('usuario_id', $usuario->id)
+            ->where('id', $id)
+            ->first();
 
         if (! $cliente) {
             return response()->json([
@@ -82,8 +98,18 @@ class ClienteController extends Controller
             ], 404);
         }
 
-        $data = $this->validateData($request, $cliente->id, $usuario->id);
-        $cliente->fill($data)->save();
+        $data = $this->validateData($request, (int) $id, $usuario->id);
+
+        DB::table($this->clientesTable)
+            ->where('id', $id)
+            ->update([
+                'nombre' => $data['nombre'],
+                'telefono' => $data['telefono'] ?? null,
+                'email' => $data['email'] ?? null,
+                'updated_at' => now(),
+            ]);
+
+        $cliente = DB::table($this->clientesTable)->where('id', $id)->first();
 
         return response()->json([
             'message' => 'Cliente actualizado.',
@@ -94,7 +120,10 @@ class ClienteController extends Controller
     public function destroy(Request $request, string $id): JsonResponse
     {
         $usuario = $this->requireUsuario($request);
-        $cliente = Cliente::where('usuario_id', $usuario->id)->find($id);
+        $cliente = DB::table($this->clientesTable)
+            ->where('usuario_id', $usuario->id)
+            ->where('id', $id)
+            ->first();
 
         if (! $cliente) {
             return response()->json([
@@ -102,7 +131,7 @@ class ClienteController extends Controller
             ], 404);
         }
 
-        $cliente->delete();
+        DB::table($this->clientesTable)->where('id', $id)->delete();
 
         return response()->json([
             'message' => 'Cliente eliminado.',
@@ -121,7 +150,7 @@ class ClienteController extends Controller
             ]);
         }
 
-        $clientes = Cliente::query()
+        $clientes = DB::table($this->clientesTable)
             ->select(['id', 'nombre', 'telefono', 'email'])
             ->where('usuario_id', $usuario->id)
             ->where(function ($query) use ($term) {
@@ -142,7 +171,10 @@ class ClienteController extends Controller
     public function relations(Request $request, string $id): JsonResponse
     {
         $usuario = $this->requireUsuario($request);
-        $cliente = Cliente::where('usuario_id', $usuario->id)->find($id);
+        $cliente = DB::table($this->clientesTable)
+            ->where('usuario_id', $usuario->id)
+            ->where('id', $id)
+            ->first();
 
         if (! $cliente) {
             return response()->json([
@@ -150,7 +182,7 @@ class ClienteController extends Controller
             ], 404);
         }
 
-        $inmuebles = DB::table('inmuebles')
+        $inmuebles = DB::table($this->inmueblesTable)
             ->select(['id', 'direccion', 'descripcion'])
             ->where('cliente_id', $cliente->id)
             ->orderByDesc('updated_at')
@@ -166,7 +198,7 @@ class ClienteController extends Controller
                 ];
             });
 
-        $contactos = DB::table('historial_acciones as ha')
+        $contactos = DB::table($this->historialTable . ' as ha')
             ->join('interesados as i', 'i.id', '=', 'ha.interesado_id')
             ->select([
                 'i.id',
@@ -208,7 +240,10 @@ class ClienteController extends Controller
     public function storeInmueble(Request $request, string $id): JsonResponse
     {
         $usuario = $this->requireUsuario($request);
-        $cliente = Cliente::where('usuario_id', $usuario->id)->find($id);
+        $cliente = DB::table($this->clientesTable)
+            ->where('usuario_id', $usuario->id)
+            ->where('id', $id)
+            ->first();
 
         if (! $cliente) {
             return response()->json([
@@ -228,7 +263,7 @@ class ClienteController extends Controller
             'moneda' => ['nullable', 'string', 'max:10'],
         ]);
 
-        $inmueble = $this->resolver->resolveInmueble($data['direccion'], $cliente, [
+        $inmueble = $this->resolver->resolveInmueble($this->inmueblesTable, $cliente->id, $data['direccion'], [
             'descripcion' => $data['descripcion'] ?? null,
             'notas' => $data['notas'] ?? null,
             'valor_estimado' => $data['valor_estimado'] ?? null,
@@ -251,7 +286,7 @@ class ClienteController extends Controller
 
     private function validateData(Request $request, ?int $clienteId = null, ?int $usuarioId = null): array
     {
-        $emailRule = Rule::unique('clientes', 'email')->ignore($clienteId);
+        $emailRule = Rule::unique($this->clientesTable, 'email')->ignore($clienteId);
         if ($usuarioId !== null) {
             $emailRule = $emailRule->where(function ($query) use ($usuarioId) {
                 return $query->where('usuario_id', $usuarioId);

@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             DemoInmobiliariaSeeder::class,
             FlujoCompletoSeeder::class,
             FlujoUsuarioSeeder::class,
+            CarlaMenusSeeder::class,
         ]);
 
         User::factory()->create([

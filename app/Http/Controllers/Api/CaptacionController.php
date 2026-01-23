@@ -23,17 +23,19 @@ class CaptacionController extends Controller
     public function index(Request $request): JsonResponse
     {
         $limit = max((int) $request->query('limit', 25), 1);
+        $usuario = $this->requireUsuario($request);
 
         $captaciones = Captacion::query()
-            ->with(['inmueble.cliente', 'usuario'])
+            ->with(['cliente.ultimoInmueble', 'usuario'])
+            ->where('usuario_id', $usuario->id)
             ->orderByDesc('created_at')
             ->limit($limit)
             ->get()
             ->map(function (Captacion $captacion) {
                 return [
                     'id' => $captacion->id,
-                    'cliente' => $captacion->inmueble->cliente->nombre ?? '—',
-                    'inmueble' => $captacion->inmueble->direccion ?? '—',
+                    'cliente' => $captacion->cliente->nombre ?? '—',
+                    'inmueble' => $captacion->cliente?->ultimoInmueble?->direccion ?? '—',
                     'estado' => $captacion->estado,
                     'fecha_inicio' => $captacion->fecha_inicio,
                     'fecha_fin' => $captacion->fecha_fin,
@@ -64,6 +66,7 @@ class CaptacionController extends Controller
             'estado_amc' => ['nullable', 'string', 'max:120'],
             'proxima_accion' => ['nullable', 'string', 'max:255'],
             'fecha_proxima_accion' => ['nullable', 'string'],
+            'fecha_inicio' => ['nullable', 'string'],
         ]);
 
         $cliente = $this->resolver->resolveCliente(
@@ -82,10 +85,11 @@ class CaptacionController extends Controller
         ]);
 
         $captacion = Captacion::create([
-            'inmueble_id' => $inmueble->id,
+            'cliente_id' => $cliente->id,
             'usuario_id' => $usuario->id,
             'estado' => $data['estado_amc'] ?? 'En proceso',
-            'fecha_inicio' => now()->toDateString(),
+            'fecha_inicio' => $this->resolver->normalizeDate($data['fecha_inicio'] ?? null)
+                ?? now()->toDateString(),
             'fecha_fin' => null,
             'notas' => $data['notas'] ?? $data['descripcion'] ?? null,
         ]);
@@ -94,6 +98,7 @@ class CaptacionController extends Controller
             'etapa' => 'Captacion',
             'accion' => $data['proxima_accion'] ?? null,
             'notas' => $data['descripcion'] ?? $data['notas'] ?? null,
+            'fecha_accion' => $captacion->fecha_inicio?->toDateString(),
             'fecha_proxima_accion' => $data['fecha_proxima_accion'] ?? null,
             'interesado_nombre' => $data['cliente_nombre'],
             'interesado_telefono' => $data['telefono'] ?? null,
@@ -107,13 +112,17 @@ class CaptacionController extends Controller
                 'cliente' => $cliente->nombre,
                 'inmueble' => $inmueble->direccion,
                 'estado' => $captacion->estado,
+                'fecha_inicio' => $captacion->fecha_inicio,
             ],
         ], 201);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $captacion = Captacion::with(['inmueble.cliente', 'usuario'])->find($id);
+        $usuario = $this->requireUsuario($request);
+        $captacion = Captacion::with(['cliente.ultimoInmueble', 'usuario'])
+            ->where('usuario_id', $usuario->id)
+            ->find($id);
 
         if (! $captacion) {
             return response()->json([
@@ -125,8 +134,8 @@ class CaptacionController extends Controller
             'message' => 'Detalle de captación recuperado.',
             'data' => [
                 'id' => $captacion->id,
-                'cliente' => $captacion->inmueble->cliente->nombre ?? '—',
-                'inmueble' => $captacion->inmueble->direccion ?? '—',
+                'cliente' => $captacion->cliente->nombre ?? '—',
+                'inmueble' => $captacion->cliente?->ultimoInmueble?->direccion ?? '—',
                 'estado' => $captacion->estado,
                 'inicio' => $captacion->fecha_inicio,
                 'fin' => $captacion->fecha_fin,
@@ -137,7 +146,8 @@ class CaptacionController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
-        $captacion = Captacion::find($id);
+        $usuario = $this->requireUsuario($request);
+        $captacion = Captacion::where('usuario_id', $usuario->id)->find($id);
 
         if (! $captacion) {
             return response()->json([
@@ -178,7 +188,7 @@ class CaptacionController extends Controller
         $resolvedFromHistorial = false;
 
         $timeline = collect();
-        $inmuebleId = $captacion?->inmueble_id;
+        $clienteId = $captacion?->cliente_id;
 
         if ($captacion && $captacion->usuario_id !== $usuario->id) {
             return response()->json([
@@ -186,13 +196,13 @@ class CaptacionController extends Controller
             ], 404);
         }
 
-        if ($inmuebleId) {
-            $timeline = $this->timelineForInmueble((int) $inmuebleId, $usuario->id);
+        if ($clienteId) {
+            $timeline = $this->timelineForCliente((int) $clienteId, $usuario->id);
         }
 
         if ($timeline->isEmpty()) {
             $historial = DB::table('historial_acciones')
-                ->select(['id', 'inmueble_id'])
+                ->select(['id', 'cliente_id'])
                 ->where('id', $id)
                 ->where('usuario_id', $usuario->id)
                 ->first();
@@ -213,15 +223,15 @@ class CaptacionController extends Controller
             }
 
             $resolvedFromHistorial = true;
-            $inmuebleId = $historial->inmueble_id;
+            $clienteId = $historial->cliente_id;
             if (! $captacion) {
-                $captacion = Captacion::where('inmueble_id', $inmuebleId)->first();
+                $captacion = Captacion::where('cliente_id', $clienteId)->first();
                 if ($captacion && $captacion->usuario_id !== $usuario->id) {
                     $captacion = null;
                 }
             }
 
-            $timeline = $this->timelineForInmueble((int) $inmuebleId, $usuario->id);
+            $timeline = $this->timelineForCliente((int) $clienteId, $usuario->id);
         }
 
         return response()->json([
@@ -238,11 +248,16 @@ class CaptacionController extends Controller
         $limit = (int) $request->query('limit', 200);
         $limit = max(1, min($limit, 1000));
 
+        $capSubquery = DB::table('captaciones')
+            ->select(['cliente_id', DB::raw('MAX(id) as captacion_id')])
+            ->where('usuario_id', $usuario->id)
+            ->groupBy('cliente_id');
+
         $timeline = $this->timelineBaseQuery($usuario->id)
-            ->join('captaciones as cap', 'cap.inmueble_id', '=', 'ha.inmueble_id')
+            ->leftJoinSub($capSubquery, 'cap', 'cap.cliente_id', '=', 'ha.cliente_id')
             ->select(array_merge(
                 $this->timelineSelectColumns(),
-                ['cap.id as captacion_id']
+                ['cap.captacion_id as captacion_id']
             ))
             ->orderByDesc('ha.fecha_accion')
             ->limit($limit)
@@ -254,11 +269,11 @@ class CaptacionController extends Controller
         ]);
     }
 
-    private function timelineForInmueble(int $inmuebleId, ?int $usuarioId = null)
+    private function timelineForCliente(int $clienteId, ?int $usuarioId = null)
     {
         return $this->timelineBaseQuery($usuarioId)
             ->select($this->timelineSelectColumns())
-            ->where('ha.inmueble_id', $inmuebleId)
+            ->where('ha.cliente_id', $clienteId)
             ->orderByDesc('ha.fecha_accion')
             ->get();
     }
@@ -306,7 +321,16 @@ class CaptacionController extends Controller
             ->join('clientes as c', 'c.id', '=', 'ha.cliente_id')
             ->join('inmuebles as i', 'i.id', '=', 'ha.inmueble_id')
             ->join('catalogo_acciones as ca', 'ca.id', '=', 'ha.accion_id')
-            ->leftJoin('captaciones as cap', 'cap.inmueble_id', '=', 'ha.inmueble_id')
+            ->leftJoinSub(
+                DB::table('captaciones')
+                    ->select(['cliente_id', DB::raw('MAX(id) as captacion_id')])
+                    ->where('usuario_id', $usuario->id)
+                    ->groupBy('cliente_id'),
+                'cap',
+                'cap.cliente_id',
+                '=',
+                'ha.cliente_id'
+            )
             ->select([
                 'ha.id',
                 'c.nombre as cliente',
@@ -314,7 +338,7 @@ class CaptacionController extends Controller
                 'ca.nombre as accion',
                 'ha.fecha_proxima_accion',
                 'ha.notas',
-                'cap.id as captacion_id',
+                'cap.captacion_id as captacion_id',
             ])
             ->where('ha.usuario_id', $usuario->id)
             ->whereDate('ha.fecha_proxima_accion', '>=', now()->toDateString())

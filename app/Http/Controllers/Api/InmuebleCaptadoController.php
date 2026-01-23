@@ -3,11 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Captacion;
-use App\Models\InmuebleCaptado;
 use App\Models\Usuario;
 use App\Services\AuthTokenService;
-use App\Services\CrmEntityResolver;
+use App\Services\ModuleEntityResolver;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -17,27 +15,39 @@ class InmuebleCaptadoController extends Controller
 {
     public function __construct(
         private readonly AuthTokenService $tokens,
-        private readonly CrmEntityResolver $resolver
+        private readonly ModuleEntityResolver $resolver
     ) {
     }
 
     public function index(Request $request): JsonResponse
     {
         $limit = max((int) $request->query('limit', 25), 1);
+        $usuario = $this->requireUsuario($request);
 
-        $items = InmuebleCaptado::query()
-            ->with(['inmueble.cliente'])
-            ->orderByDesc('created_at')
+        $items = DB::table('inmuebles_captados_registros as ic')
+            ->join('inmuebles_captados_inmuebles as i', 'i.id', '=', 'ic.inmueble_id')
+            ->join('inmuebles_captados_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->join('inmuebles_captados_captaciones as cap', 'cap.id', '=', 'ic.captacion_id')
+            ->select([
+                'ic.id',
+                'c.nombre as cliente',
+                'i.direccion as inmueble',
+                'ic.estado',
+                'ic.captacion_id',
+                'ic.created_at',
+            ])
+            ->where('c.usuario_id', $usuario->id)
+            ->orderByDesc('ic.created_at')
             ->limit($limit)
             ->get()
-            ->map(function (InmuebleCaptado $captado) {
+            ->map(function ($row) {
                 return [
-                    'id' => $captado->id,
-                    'cliente' => $captado->inmueble->cliente->nombre ?? '—',
-                    'inmueble' => $captado->inmueble->direccion ?? '—',
-                    'estado' => $captado->estado,
-                    'captacion_id' => $captado->captacion_id,
-                    'fecha' => $captado->created_at,
+                    'id' => $row->id,
+                    'cliente' => $row->cliente ?? '—',
+                    'inmueble' => $row->inmueble ?? '—',
+                    'estado' => $row->estado,
+                    'captacion_id' => $row->captacion_id,
+                    'fecha' => $row->created_at,
                 ];
             });
 
@@ -61,34 +71,46 @@ class InmuebleCaptadoController extends Controller
         ]);
 
         $cliente = $this->resolver->resolveCliente(
+            'inmuebles_captados_clientes',
             $data['cliente_nombre'] ?? 'Cliente sin nombre',
             null,
             null,
             $usuario->id
         );
 
-        $inmueble = $this->resolver->resolveInmueble($data['inmueble_nombre'], $cliente, [
+        $inmueble = $this->resolver->resolveInmueble('inmuebles_captados_inmuebles', $cliente->id, $data['inmueble_nombre'], [
             'descripcion' => $data['notas'] ?? null,
             'notas' => $data['notas'] ?? null,
         ]);
 
-        $captacion = Captacion::firstOrCreate([
-            'inmueble_id' => $inmueble->id,
-            'usuario_id' => $usuario->id,
-        ], [
-            'estado' => 'Activo',
-            'fecha_inicio' => now()->toDateString(),
-            'fecha_fin' => null,
-            'notas' => $data['notas'] ?? null,
-        ]);
+        $captacion = DB::table('inmuebles_captados_captaciones')
+            ->where('cliente_id', $cliente->id)
+            ->where('usuario_id', $usuario->id)
+            ->first();
 
-        $captado = InmuebleCaptado::create([
+        if (! $captacion) {
+            $captacionId = DB::table('inmuebles_captados_captaciones')->insertGetId([
+                'cliente_id' => $cliente->id,
+                'usuario_id' => $usuario->id,
+                'estado' => 'Activo',
+                'fecha_inicio' => now()->toDateString(),
+                'fecha_fin' => null,
+                'notas' => $data['notas'] ?? null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            $captacion = DB::table('inmuebles_captados_captaciones')->where('id', $captacionId)->first();
+        }
+
+        $captadoId = DB::table('inmuebles_captados_registros')->insertGetId([
             'inmueble_id' => $inmueble->id,
             'captacion_id' => $captacion->id,
             'estado' => $data['proxima_accion'] ?? 'En seguimiento',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
-        $this->resolver->registerHistorialAccion($cliente, $inmueble, $usuario->id, [
+        $this->resolver->registerHistorialAccion('inmuebles_captados_historial_acciones', $cliente->id, $inmueble->id, $usuario->id, [
             'etapa' => 'Promocion',
             'accion' => $data['proxima_accion'] ?? null,
             'notas' => $data['notas'] ?? null,
@@ -99,16 +121,32 @@ class InmuebleCaptadoController extends Controller
         return response()->json([
             'message' => 'Inmueble captado registrado.',
             'data' => [
-                'id' => $captado->id,
+                'id' => $captadoId,
                 'captacion_id' => $captacion->id,
                 'inmueble' => $inmueble->direccion,
             ],
         ], 201);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $captado = InmuebleCaptado::with(['inmueble.cliente', 'captacion'])->find($id);
+        $usuario = $this->requireUsuario($request);
+
+        $captado = DB::table('inmuebles_captados_registros as ic')
+            ->join('inmuebles_captados_inmuebles as i', 'i.id', '=', 'ic.inmueble_id')
+            ->join('inmuebles_captados_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->join('inmuebles_captados_captaciones as cap', 'cap.id', '=', 'ic.captacion_id')
+            ->select([
+                'ic.id',
+                'ic.estado',
+                'ic.captacion_id',
+                'i.direccion as inmueble',
+                'c.nombre as cliente',
+                'cap.notas as captacion_notas',
+            ])
+            ->where('c.usuario_id', $usuario->id)
+            ->where('ic.id', $id)
+            ->first();
 
         if (! $captado) {
             return response()->json([
@@ -120,18 +158,26 @@ class InmuebleCaptadoController extends Controller
             'message' => 'Detalle de inmueble captado recuperado.',
             'data' => [
                 'id' => $captado->id,
-                'cliente' => $captado->inmueble->cliente->nombre ?? '—',
-                'inmueble' => $captado->inmueble->direccion ?? '—',
+                'cliente' => $captado->cliente ?? '—',
+                'inmueble' => $captado->inmueble ?? '—',
                 'estado' => $captado->estado,
                 'captacion_id' => $captado->captacion_id,
-                'notas' => $captado->captacion->notas ?? null,
+                'notas' => $captado->captacion_notas,
             ],
         ]);
     }
 
     public function update(Request $request, string $id): JsonResponse
     {
-        $captado = InmuebleCaptado::find($id);
+        $usuario = $this->requireUsuario($request);
+
+        $captado = DB::table('inmuebles_captados_registros as ic')
+            ->join('inmuebles_captados_inmuebles as i', 'i.id', '=', 'ic.inmueble_id')
+            ->join('inmuebles_captados_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->where('c.usuario_id', $usuario->id)
+            ->where('ic.id', $id)
+            ->select(['ic.id'])
+            ->first();
 
         if (! $captado) {
             return response()->json([
@@ -144,35 +190,46 @@ class InmuebleCaptadoController extends Controller
         ]);
 
         if (isset($data['estado'])) {
-            $captado->estado = $data['estado'];
-            $captado->save();
+            DB::table('inmuebles_captados_registros')
+                ->where('id', $id)
+                ->update([
+                    'estado' => $data['estado'],
+                    'updated_at' => now(),
+                ]);
         }
+
+        $updated = DB::table('inmuebles_captados_registros')->where('id', $id)->first();
 
         return response()->json([
             'message' => 'Inmueble captado actualizado.',
-            'data' => $captado,
+            'data' => $updated,
         ]);
     }
 
     public function historial(Request $request, string $id): JsonResponse
     {
         $usuario = $this->requireUsuario($request);
-        $captado = InmuebleCaptado::with('inmueble')->find($id);
 
-        if (! $captado) {
+        $captado = DB::table('inmuebles_captados_registros as ic')
+            ->join('inmuebles_captados_inmuebles as i', 'i.id', '=', 'ic.inmueble_id')
+            ->join('inmuebles_captados_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->select([
+                'ic.id',
+                'ic.estado',
+                'ic.inmueble_id',
+                'i.direccion as inmueble',
+                'c.usuario_id',
+            ])
+            ->where('ic.id', $id)
+            ->first();
+
+        if (! $captado || $captado->usuario_id !== $usuario->id) {
             return response()->json([
                 'message' => 'Inmueble captado no encontrado.',
             ], 404);
         }
 
-        $captacion = Captacion::find($captado->captacion_id);
-        if ($captacion && $captacion->usuario_id !== $usuario->id) {
-            return response()->json([
-                'message' => 'Inmueble captado no encontrado.',
-            ], 404);
-        }
-
-        $acciones = DB::table('historial_acciones as ha')
+        $acciones = DB::table('inmuebles_captados_historial_acciones as ha')
             ->select([
                 'ha.id',
                 'ha.notas',
@@ -194,7 +251,7 @@ class InmuebleCaptadoController extends Controller
             'message' => 'Historial de inmueble captado recuperado.',
             'inmueble_captado_id' => (int) $id,
             'data' => [
-                'inmueble' => $captado->inmueble->direccion ?? '—',
+                'inmueble' => $captado->inmueble ?? '—',
                 'estado' => $captado->estado,
                 'acciones' => $acciones,
             ],
@@ -207,10 +264,10 @@ class InmuebleCaptadoController extends Controller
         $limit = (int) $request->query('limit', 200);
         $limit = max(1, min($limit, 1000));
 
-        $acciones = DB::table('historial_acciones as ha')
-            ->join('inmuebles as i', 'i.id', '=', 'ha.inmueble_id')
-            ->join('inmuebles_captados as ic', 'ic.inmueble_id', '=', 'ha.inmueble_id')
-            ->leftJoin('captaciones as cap', 'cap.id', '=', 'ic.captacion_id')
+        $acciones = DB::table('inmuebles_captados_historial_acciones as ha')
+            ->join('inmuebles_captados_inmuebles as i', 'i.id', '=', 'ha.inmueble_id')
+            ->join('inmuebles_captados_registros as ic', 'ic.inmueble_id', '=', 'ha.inmueble_id')
+            ->leftJoin('inmuebles_captados_captaciones as cap', 'cap.id', '=', 'ic.captacion_id')
             ->select([
                 'ha.id',
                 'i.direccion as inmueble',

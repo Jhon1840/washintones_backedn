@@ -38,7 +38,7 @@ class HistorialController extends Controller
             ->leftJoin('interesados as interes', 'interes.id', '=', 'ha.interesado_id')
             ->leftJoin('asesores as a', 'a.id', '=', 'ha.asesor_id')
             ->leftJoin('usuarios as u', 'u.id', '=', 'ha.usuario_id')
-            ->leftJoin('captaciones as cap', 'cap.inmueble_id', '=', 'ha.inmueble_id')
+            ->leftJoin('captaciones as cap', 'cap.cliente_id', '=', 'ha.cliente_id')
             ->leftJoin('colocaciones as col', 'col.inmueble_id', '=', 'ha.inmueble_id')
             ->leftJoin('inmuebles_captados as ic', 'ic.inmueble_id', '=', 'ha.inmueble_id')
             ->leftJoin('pasar_informacion as pi', 'pi.inmueble_id', '=', 'ha.inmueble_id')

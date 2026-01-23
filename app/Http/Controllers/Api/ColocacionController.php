@@ -3,10 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Colocacion;
 use App\Models\Usuario;
 use App\Services\AuthTokenService;
-use App\Services\CrmEntityResolver;
+use App\Services\ModuleEntityResolver;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,34 +15,48 @@ class ColocacionController extends Controller
 {
     public function __construct(
         private readonly AuthTokenService $tokens,
-        private readonly CrmEntityResolver $resolver
+        private readonly ModuleEntityResolver $resolver
     ) {
     }
 
     public function index(Request $request): JsonResponse
     {
         $limit = max((int) $request->query('limit', 25), 1);
+        $usuario = $this->requireUsuario($request);
 
-        $colocaciones = Colocacion::query()
-            ->with(['inmueble.cliente', 'asesor'])
-            ->orderByDesc('created_at')
+        $colocaciones = DB::table('colocacion_registros as col')
+            ->join('colocacion_inmuebles as i', 'i.id', '=', 'col.inmueble_id')
+            ->join('colocacion_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->leftJoin('asesores as a', 'a.id', '=', 'col.asesor_id')
+            ->select([
+                'col.id',
+                'c.nombre as cliente',
+                'i.direccion as inmueble',
+                'col.estado_id',
+                'a.nombre as asesor',
+                'col.notas',
+                'col.created_at',
+            ])
+            ->where('c.usuario_id', $usuario->id)
+            ->orderByDesc('col.created_at')
             ->limit($limit)
-            ->get()
-            ->map(function (Colocacion $colocacion) {
-                return [
-                    'id' => $colocacion->id,
-                    'cliente' => $colocacion->inmueble->cliente->nombre ?? '—',
-                    'inmueble' => $colocacion->inmueble->direccion ?? '—',
-                    'estado_id' => $colocacion->estado_id,
-                    'asesor' => $colocacion->asesor->nombre ?? '—',
-                    'notas' => $colocacion->notas,
-                    'created_at' => $colocacion->created_at,
-                ];
-            });
+            ->get();
+
+        $items = $colocaciones->map(function ($row) {
+            return [
+                'id' => $row->id,
+                'cliente' => $row->cliente ?? '—',
+                'inmueble' => $row->inmueble ?? '—',
+                'estado_id' => $row->estado_id,
+                'asesor' => $row->asesor ?? '—',
+                'notas' => $row->notas,
+                'created_at' => $row->created_at,
+            ];
+        });
 
         return response()->json([
             'message' => 'Colocaciones recuperadas.',
-            'data' => $colocaciones,
+            'data' => $items,
         ]);
     }
 
@@ -70,6 +83,7 @@ class ColocacionController extends Controller
         ]);
 
         $cliente = $this->resolver->resolveCliente(
+            'colocacion_clientes',
             $data['cliente_nombre'],
             $data['telefono'] ?? null,
             $data['correo'] ?? null,
@@ -78,7 +92,7 @@ class ColocacionController extends Controller
 
         $direccion = $data['inmueble_sugerido'] ?? ('Oportunidad ' . $cliente->nombre);
 
-        $inmueble = $this->resolver->resolveInmueble($direccion, $cliente, [
+        $inmueble = $this->resolver->resolveInmueble('colocacion_inmuebles', $cliente->id, $direccion, [
             'descripcion' => $data['descripcion_busqueda'] ?? null,
             'notas' => $data['notas'] ?? null,
             'valor_estimado' => $data['presupuesto'] ?? null,
@@ -94,13 +108,15 @@ class ColocacionController extends Controller
         $monedaId = $this->resolver->catalogId('catalogo_monedas', $data['moneda'] ?? 'MXN', 'codigo');
 
         $busqueda = $this->resolver->ensureBusqueda(
-            $cliente,
+            'colocacion_busquedas_clientes',
+            'colocacion_busqueda_inmueble',
+            $cliente->id,
             $data,
             $operacionId,
             $tipoId,
             $zonaId,
             $monedaId,
-            $inmueble
+            $inmueble->id
         );
 
         $asesorNombre = $data['asesor_nombre'] ?? $usuario->nombre;
@@ -118,15 +134,17 @@ class ColocacionController extends Controller
 
         $estadoId = $this->resolver->catalogId('catalogo_estados_colocacion', null);
 
-        $colocacion = Colocacion::create([
+        $colocacionId = DB::table('colocacion_registros')->insertGetId([
             'busqueda_id' => $busqueda->id,
             'inmueble_id' => $inmueble->id,
             'asesor_id' => $asesor->id,
             'estado_id' => $estadoId,
             'notas' => $data['notas'] ?? 'Colocación generada desde app móvil.',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
-        $this->resolver->registerHistorialAccion($cliente, $inmueble, $usuario->id, [
+        $this->resolver->registerHistorialAccion('colocacion_historial_acciones', $cliente->id, $inmueble->id, $usuario->id, [
             'etapa' => 'Promocion',
             'accion' => $data['proxima_accion'] ?? null,
             'notas' => $data['notas'] ?? null,
@@ -141,16 +159,31 @@ class ColocacionController extends Controller
         return response()->json([
             'message' => 'Colocación registrada correctamente.',
             'data' => [
-                'id' => $colocacion->id,
+                'id' => $colocacionId,
                 'cliente' => $cliente->nombre,
                 'inmueble' => $inmueble->direccion,
             ],
         ], 201);
     }
 
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $colocacion = Colocacion::with(['inmueble.cliente', 'asesor'])->find($id);
+        $usuario = $this->requireUsuario($request);
+        $colocacion = DB::table('colocacion_registros as col')
+            ->join('colocacion_inmuebles as i', 'i.id', '=', 'col.inmueble_id')
+            ->join('colocacion_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->leftJoin('asesores as a', 'a.id', '=', 'col.asesor_id')
+            ->select([
+                'col.id',
+                'c.nombre as cliente',
+                'i.direccion as inmueble',
+                'col.estado_id',
+                'a.nombre as asesor',
+                'col.notas',
+            ])
+            ->where('c.usuario_id', $usuario->id)
+            ->where('col.id', $id)
+            ->first();
 
         if (! $colocacion) {
             return response()->json([
@@ -162,10 +195,10 @@ class ColocacionController extends Controller
             'message' => 'Detalle de colocación recuperado.',
             'data' => [
                 'id' => $colocacion->id,
-                'cliente' => $colocacion->inmueble->cliente->nombre ?? '—',
-                'inmueble' => $colocacion->inmueble->direccion ?? '—',
+                'cliente' => $colocacion->cliente ?? '—',
+                'inmueble' => $colocacion->inmueble ?? '—',
                 'estado_id' => $colocacion->estado_id,
-                'asesor' => $colocacion->asesor->nombre ?? '—',
+                'asesor' => $colocacion->asesor ?? '—',
                 'notas' => $colocacion->notas,
             ],
         ]);
@@ -173,7 +206,14 @@ class ColocacionController extends Controller
 
     public function update(Request $request, string $id): JsonResponse
     {
-        $colocacion = Colocacion::find($id);
+        $usuario = $this->requireUsuario($request);
+        $colocacion = DB::table('colocacion_registros as col')
+            ->join('colocacion_inmuebles as i', 'i.id', '=', 'col.inmueble_id')
+            ->join('colocacion_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->where('c.usuario_id', $usuario->id)
+            ->where('col.id', $id)
+            ->select(['col.id'])
+            ->first();
 
         if (! $colocacion) {
             return response()->json([
@@ -186,26 +226,44 @@ class ColocacionController extends Controller
             'notas' => ['nullable', 'string'],
         ]);
 
+        $updates = [];
         if (isset($data['estado_id'])) {
-            $colocacion->estado_id = (int) $data['estado_id'];
+            $updates['estado_id'] = (int) $data['estado_id'];
         }
-
         if (array_key_exists('notas', $data)) {
-            $colocacion->notas = $data['notas'];
+            $updates['notas'] = $data['notas'];
+        }
+        if ($updates) {
+            $updates['updated_at'] = now();
+            DB::table('colocacion_registros')->where('id', $id)->update($updates);
         }
 
-        $colocacion->save();
+        $updated = DB::table('colocacion_registros')->where('id', $id)->first();
 
         return response()->json([
             'message' => 'Colocación actualizada.',
-            'data' => $colocacion,
+            'data' => $updated,
         ]);
     }
 
     public function historial(Request $request, string $id): JsonResponse
     {
         $usuario = $this->requireUsuario($request);
-        $colocacion = Colocacion::with(['inmueble', 'asesor'])->find($id);
+        $colocacion = DB::table('colocacion_registros as col')
+            ->join('colocacion_inmuebles as i', 'i.id', '=', 'col.inmueble_id')
+            ->join('colocacion_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->leftJoin('asesores as a', 'a.id', '=', 'col.asesor_id')
+            ->select([
+                'col.id',
+                'col.inmueble_id',
+                'col.estado_id',
+                'col.notas',
+                'i.direccion as inmueble',
+                'a.nombre as asesor',
+            ])
+            ->where('c.usuario_id', $usuario->id)
+            ->where('col.id', $id)
+            ->first();
 
         if (! $colocacion) {
             return response()->json([
@@ -213,7 +271,7 @@ class ColocacionController extends Controller
             ], 404);
         }
 
-        $tieneAcceso = DB::table('historial_acciones')
+        $tieneAcceso = DB::table('colocacion_historial_acciones')
             ->where('inmueble_id', $colocacion->inmueble_id)
             ->where('usuario_id', $usuario->id)
             ->exists();
@@ -233,8 +291,8 @@ class ColocacionController extends Controller
             'message' => 'Historial de colocación recuperado.',
             'colocacion_id' => (int) $id,
             'data' => [
-                'inmueble' => $colocacion->inmueble->direccion ?? '—',
-                'asesor' => $colocacion->asesor->nombre ?? '—',
+                'inmueble' => $colocacion->inmueble ?? '—',
+                'asesor' => $colocacion->asesor ?? '—',
                 'estado_id' => $colocacion->estado_id,
                 'notas' => $colocacion->notas,
                 'acciones' => $acciones,
@@ -249,10 +307,10 @@ class ColocacionController extends Controller
         $limit = max(1, min($limit, 1000));
 
         $acciones = $this->accionesBaseQuery($usuario->id)
-            ->join('colocaciones as col', 'col.inmueble_id', '=', 'ha.inmueble_id')
+            ->join('colocacion_registros as col', 'col.inmueble_id', '=', 'ha.inmueble_id')
             ->join('asesores as ase', 'ase.id', '=', 'col.asesor_id')
             ->join('catalogo_estados_colocacion as est', 'est.id', '=', 'col.estado_id')
-            ->join('inmuebles as inm', 'inm.id', '=', 'ha.inmueble_id')
+            ->join('colocacion_inmuebles as inm', 'inm.id', '=', 'ha.inmueble_id')
             ->select([
                 'ha.id',
                 'col.id as colocacion_id',
@@ -276,7 +334,7 @@ class ColocacionController extends Controller
 
     private function accionesBaseQuery(?int $usuarioId = null)
     {
-        $query = DB::table('historial_acciones as ha')
+        $query = DB::table('colocacion_historial_acciones as ha')
             ->select([
                 'ha.id',
                 'ha.notas',
