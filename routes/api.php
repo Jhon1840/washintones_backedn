@@ -58,6 +58,9 @@ Route::delete('inmuebles/documentos/{id}', [InmuebleController::class, 'destroyD
 Route::get('captaciones/historial', [CaptacionController::class, 'historialGlobal']);
 Route::get('captaciones/proximas-acciones', [CaptacionController::class, 'proximasAcciones']);
 Route::get('captaciones/{id}/historial', [CaptacionController::class, 'historial']);
+Route::get('captaciones/historial/papelera', [CaptacionController::class, 'historialPapelera']);
+Route::post('captaciones/historial/soft-delete', [CaptacionController::class, 'softDeleteHistorialGrupo']);
+Route::post('captaciones/historial/restore', [CaptacionController::class, 'restoreHistorialGrupo']);
 Route::apiResource('captaciones', CaptacionController::class)->except(['destroy']);
 
 Route::get('inmuebles-captados/{id}/historial', [InmuebleCaptadoController::class, 'historial']);

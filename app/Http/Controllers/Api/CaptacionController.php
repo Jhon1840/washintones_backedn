@@ -270,6 +270,146 @@ class CaptacionController extends Controller
         ]);
     }
 
+    public function historialPapelera(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+
+        $activeClientes = DB::table('historial_acciones')
+            ->select('cliente_id')
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at');
+
+        $capSubquery = DB::table('captaciones')
+            ->select(['cliente_id', DB::raw('MAX(id) as captacion_id')])
+            ->where('usuario_id', $usuario->id)
+            ->groupBy('cliente_id');
+
+        $rows = DB::table('historial_acciones as ha')
+            ->join('clientes as c', 'c.id', '=', 'ha.cliente_id')
+            ->join('inmuebles as i', 'i.id', '=', 'ha.inmueble_id')
+            ->join('catalogo_etapas as ce', 'ce.id', '=', 'ha.etapa_id')
+            ->join('catalogo_acciones as ca', 'ca.id', '=', 'ha.accion_id')
+            ->leftJoin('interesados as interes', 'interes.id', '=', 'ha.interesado_id')
+            ->leftJoin('asesores as a', 'a.id', '=', 'ha.asesor_id')
+            ->leftJoinSub($capSubquery, 'cap', 'cap.cliente_id', '=', 'ha.cliente_id')
+            ->select([
+                'ha.id',
+                'ha.inmueble_id',
+                'c.nombre as cliente',
+                'i.direccion as inmueble',
+                'ce.nombre as etapa',
+                'ca.nombre as accion',
+                'ha.notas',
+                'ha.fecha_accion',
+                'ha.fecha_proxima_accion',
+                'interes.nombre as interesado',
+                'a.nombre as asesor',
+                'cap.captacion_id as captacion_id',
+            ])
+            ->where('ha.usuario_id', $usuario->id)
+            ->whereNotNull('ha.deleted_at')
+            ->whereNotIn('ha.cliente_id', $activeClientes)
+            ->orderByDesc('ha.fecha_accion')
+            ->orderByDesc('ha.id')
+            ->get();
+
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $captacionId = (int) ($row->captacion_id ?? 0);
+            if ($captacionId < 1) {
+                continue;
+            }
+
+            $entry = (array) $row;
+
+            if (! array_key_exists($captacionId, $groups)) {
+                $groups[$captacionId] = [
+                    'captacion_id' => $captacionId,
+                    'total_acciones' => 1,
+                    'latest' => $entry,
+                ];
+                continue;
+            }
+
+            $groups[$captacionId]['total_acciones'] += 1;
+            if ($this->isMoreRecentRow($row, $groups[$captacionId]['latest'])) {
+                $groups[$captacionId]['latest'] = $entry;
+            }
+        }
+
+        return response()->json([
+            'message' => 'Papelera de captacion recuperada.',
+            'data' => array_values($groups),
+        ]);
+    }
+
+    public function softDeleteHistorialGrupo(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $captacionId = (int) $request->input('captacion_id');
+
+        if ($captacionId < 1) {
+            return response()->json([
+                'message' => 'Captacion invalida.',
+            ], 422);
+        }
+
+        $captacion = Captacion::where('id', $captacionId)
+            ->where('usuario_id', $usuario->id)
+            ->first();
+
+        if (! $captacion) {
+            return response()->json([
+                'message' => 'Captacion no encontrada.',
+            ], 404);
+        }
+
+        $updated = DB::table('historial_acciones')
+            ->where('cliente_id', $captacion->cliente_id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
+            ->update(['deleted_at' => now()]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial enviado a papelera.' : 'Historial no encontrado.',
+            'total' => $updated,
+        ]);
+    }
+
+    public function restoreHistorialGrupo(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $captacionId = (int) $request->input('captacion_id');
+
+        if ($captacionId < 1) {
+            return response()->json([
+                'message' => 'Captacion invalida.',
+            ], 422);
+        }
+
+        $captacion = Captacion::where('id', $captacionId)
+            ->where('usuario_id', $usuario->id)
+            ->first();
+
+        if (! $captacion) {
+            return response()->json([
+                'message' => 'Captacion no encontrada.',
+            ], 404);
+        }
+
+        $updated = DB::table('historial_acciones')
+            ->where('cliente_id', $captacion->cliente_id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNotNull('deleted_at')
+            ->update(['deleted_at' => null]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial restaurado.' : 'Historial no encontrado.',
+            'total' => $updated,
+        ]);
+    }
+
     private function timelineForCliente(int $clienteId, ?int $usuarioId = null)
     {
         return $this->timelineBaseQuery($usuarioId)
@@ -377,5 +517,19 @@ class CaptacionController extends Controller
         }
 
         return $usuario;
+    }
+
+    private function isMoreRecentRow(object $candidate, array $current): bool
+    {
+        $candidateDate = $candidate->fecha_accion ? strtotime($candidate->fecha_accion) : 0;
+        $currentDate = isset($current['fecha_accion'])
+            ? strtotime($current['fecha_accion'])
+            : 0;
+
+        if ($candidateDate === $currentDate) {
+            return ((int) $candidate->id) > ((int) ($current['id'] ?? 0));
+        }
+
+        return $candidateDate > $currentDate;
     }
 }
