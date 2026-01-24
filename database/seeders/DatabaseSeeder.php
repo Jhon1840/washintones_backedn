@@ -24,11 +24,12 @@ class DatabaseSeeder extends Seeder
             FlujoCompletoSeeder::class,
             FlujoUsuarioSeeder::class,
             CarlaMenusSeeder::class,
+            CarlaNotificacionTareaSeeder::class,
         ]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        User::factory()->firstOrCreate(
+            ['email' => 'test@example.com'],
+            ['name' => 'Test User']
+        );
     }
 }

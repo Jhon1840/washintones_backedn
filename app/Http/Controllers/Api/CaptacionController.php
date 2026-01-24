@@ -205,6 +205,7 @@ class CaptacionController extends Controller
                 ->select(['id', 'cliente_id'])
                 ->where('id', $id)
                 ->where('usuario_id', $usuario->id)
+                ->whereNull('deleted_at')
                 ->first();
 
             if (! $historial) {
@@ -287,6 +288,7 @@ class CaptacionController extends Controller
             ->join('catalogo_acciones as ca', 'ca.id', '=', 'ha.accion_id')
             ->leftJoin('interesados as interes', 'interes.id', '=', 'ha.interesado_id')
             ->leftJoin('asesores as a', 'a.id', '=', 'ha.asesor_id');
+        $query->whereNull('ha.deleted_at');
 
         if ($usuarioId !== null) {
             $query->where('ha.usuario_id', $usuarioId);
@@ -341,6 +343,7 @@ class CaptacionController extends Controller
                 'cap.captacion_id as captacion_id',
             ])
             ->where('ha.usuario_id', $usuario->id)
+            ->whereNull('ha.deleted_at')
             ->whereDate('ha.fecha_proxima_accion', '>=', now()->toDateString())
             ->orderBy('ha.fecha_proxima_accion')
             ->limit($limit)

@@ -274,6 +274,7 @@ class ColocacionController extends Controller
         $tieneAcceso = DB::table('colocacion_historial_acciones')
             ->where('inmueble_id', $colocacion->inmueble_id)
             ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
             ->exists();
 
         if (! $tieneAcceso) {
@@ -342,6 +343,7 @@ class ColocacionController extends Controller
                 'ha.fecha_proxima_accion',
                 'ha.inmueble_id',
             ]);
+        $query->whereNull('ha.deleted_at');
 
         if ($usuarioId !== null) {
             $query->where('ha.usuario_id', $usuarioId);

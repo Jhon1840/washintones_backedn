@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'fcm' => [
+        'server_key' => env('FCM_SERVER_KEY'),
+        'service_account_path' => env('FCM_SERVICE_ACCOUNT_JSON'),
+        'project_id' => env('FCM_PROJECT_ID'),
+    ],
+    'firebase' => [
+        'credentials' => env('FIREBASE_CREDENTIALS'),
+        'project_id' => env('FIREBASE_PROJECT_ID'),
+    ],
+
 ];

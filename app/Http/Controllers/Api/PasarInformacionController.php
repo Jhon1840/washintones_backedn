@@ -232,6 +232,7 @@ class PasarInformacionController extends Controller
             ])
             ->where('ha.inmueble_id', $registro->inmueble_id)
             ->where('ha.usuario_id', $usuario->id)
+            ->whereNull('ha.deleted_at')
             ->orderByDesc('ha.fecha_accion')
             ->get();
 
@@ -267,6 +268,7 @@ class PasarInformacionController extends Controller
                 'ha.fecha_proxima_accion',
             ])
             ->where('ha.usuario_id', $usuario->id)
+            ->whereNull('ha.deleted_at')
             ->orderByDesc('ha.fecha_accion')
             ->limit($limit)
             ->get();

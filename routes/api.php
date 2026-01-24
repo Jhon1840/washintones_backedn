@@ -9,11 +9,13 @@ use App\Http\Controllers\Api\ClienteController;
 use App\Http\Controllers\Api\ColocacionClienteController;
 use App\Http\Controllers\Api\ColocacionController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\HistorialController;
 use App\Http\Controllers\Api\InmuebleCaptadoController;
 use App\Http\Controllers\Api\InmuebleCaptadoClienteController;
 use App\Http\Controllers\Api\InmuebleController;
 use App\Http\Controllers\Api\InteresadoController;
+use App\Http\Controllers\Api\NotificacionController;
 use App\Http\Controllers\Api\PasarInformacionController;
 use App\Http\Controllers\Api\PasarInformacionClienteController;
 use App\Http\Controllers\Api\PlanController;
@@ -100,10 +102,17 @@ Route::apiResource('pasar-informacion/clientes', PasarInformacionClienteControll
 Route::apiResource('pasar-informacion', PasarInformacionController::class)->except(['destroy']);
 
 Route::get('historial', [HistorialController::class, 'index']);
+Route::post('historial/soft-delete', [HistorialController::class, 'softDelete']);
+Route::post('historial/soft-delete-all', [HistorialController::class, 'softDeleteAll']);
+Route::post('historial/restore-all', [HistorialController::class, 'restoreAll']);
 
 Route::apiResource('tareas', TareaController::class)->only(['index', 'store', 'update']);
 
 Route::get('dashboard', [DashboardController::class, 'index']);
+Route::post('device-tokens', [DeviceTokenController::class, 'store']);
+Route::delete('device-tokens', [DeviceTokenController::class, 'destroy']);
+Route::get('notificaciones', [NotificacionController::class, 'index']);
+Route::post('notificaciones/{id}/leer', [NotificacionController::class, 'markRead']);
 
 Route::middleware('auth.admin')->group(function () {
     Route::get('admin/dashboard', [AdminDashboardController::class, 'index']);

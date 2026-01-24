@@ -24,26 +24,31 @@ class DashboardController extends Controller
         $accionesHoy = DB::table('historial_acciones')
             ->whereDate('fecha_accion', $today)
             ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
             ->count();
 
         $accionesHoy += DB::table('colocacion_historial_acciones')
             ->whereDate('fecha_accion', $today)
             ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
             ->count();
 
         $accionesHoy += DB::table('visitas_historial_acciones')
             ->whereDate('fecha_accion', $today)
             ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
             ->count();
 
         $accionesHoy += DB::table('pasar_informacion_historial_acciones')
             ->whereDate('fecha_accion', $today)
             ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
             ->count();
 
         $accionesHoy += DB::table('inmuebles_captados_historial_acciones')
             ->whereDate('fecha_accion', $today)
             ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
             ->count();
 
         $visitasHoy = DB::table('visitas_registros as v')
@@ -55,6 +60,7 @@ class DashboardController extends Controller
         $tareasVencidas = DB::table('tareas as t')
             ->join('historial_acciones as ha', 'ha.id', '=', 't.historial_id')
             ->where('ha.usuario_id', $usuario->id)
+            ->whereNull('ha.deleted_at')
             ->where('t.completado', false)
             ->whereDate('t.fecha', '<', $today)
             ->count();

@@ -12,6 +12,24 @@ use Illuminate\Support\Facades\DB;
 
 class HistorialController extends Controller
 {
+    private const TABLE_MAP = [
+        'captacion' => 'historial_acciones',
+        'captaciones' => 'historial_acciones',
+        'historial_acciones' => 'historial_acciones',
+        'colocacion' => 'colocacion_historial_acciones',
+        'colocaciones' => 'colocacion_historial_acciones',
+        'colocacion_historial_acciones' => 'colocacion_historial_acciones',
+        'visita' => 'visitas_historial_acciones',
+        'visitas' => 'visitas_historial_acciones',
+        'visitas_historial_acciones' => 'visitas_historial_acciones',
+        'pasar_informacion' => 'pasar_informacion_historial_acciones',
+        'pasar-informacion' => 'pasar_informacion_historial_acciones',
+        'pasar_informacion_historial_acciones' => 'pasar_informacion_historial_acciones',
+        'inmuebles_captados' => 'inmuebles_captados_historial_acciones',
+        'inmueble_captado' => 'inmuebles_captados_historial_acciones',
+        'inmuebles_captados_historial_acciones' => 'inmuebles_captados_historial_acciones',
+    ];
+
     public function __construct(private readonly AuthTokenService $tokens)
     {
     }
@@ -64,6 +82,7 @@ class HistorialController extends Controller
                 'pi.id as pasar_informacion_id',
                 'v.id as visita_id',
             ]);
+        $query->whereNull('ha.deleted_at');
 
         if (! empty($filters['cliente_id'])) {
             $query->where('ha.cliente_id', (int) $filters['cliente_id']);
@@ -112,6 +131,79 @@ class HistorialController extends Controller
         ]);
     }
 
+    public function softDelete(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $table = $this->resolveTable((string) $request->input('tabla', ''));
+        $id = (int) $request->input('id');
+
+        if (! $table || $id < 1) {
+            return response()->json([
+                'message' => 'Tabla o id invalido.',
+            ], 422);
+        }
+
+        $updated = DB::table($table)
+            ->where('id', $id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
+            ->update(['deleted_at' => now()]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial eliminado.' : 'Historial no encontrado.',
+        ]);
+    }
+
+    public function softDeleteAll(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $tables = $this->resolveTables($request->input('tabla'));
+        if (! $tables) {
+            return response()->json([
+                'message' => 'Tabla invalida.',
+            ], 422);
+        }
+        $total = 0;
+
+        foreach ($tables as $table) {
+            $total += DB::table($table)
+                ->where('usuario_id', $usuario->id)
+                ->whereNull('deleted_at')
+                ->update(['deleted_at' => now()]);
+        }
+
+        return response()->json([
+            'message' => 'Historial eliminado.',
+            'total' => $total,
+            'tablas' => $tables,
+        ]);
+    }
+
+    public function restoreAll(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $tables = $this->resolveTables($request->input('tabla'));
+        if (! $tables) {
+            return response()->json([
+                'message' => 'Tabla invalida.',
+            ], 422);
+        }
+        $total = 0;
+
+        foreach ($tables as $table) {
+            $total += DB::table($table)
+                ->where('usuario_id', $usuario->id)
+                ->whereNotNull('deleted_at')
+                ->update(['deleted_at' => null]);
+        }
+
+        return response()->json([
+            'message' => 'Historial restaurado.',
+            'total' => $total,
+            'tablas' => $tables,
+        ]);
+    }
+
     private function requireUsuario(Request $request): Usuario
     {
         $usuario = $this->tokens->resolveUserFromRequest($request);
@@ -123,5 +215,21 @@ class HistorialController extends Controller
         }
 
         return $usuario;
+    }
+
+    private function resolveTable(string $table): ?string
+    {
+        $key = strtolower(trim($table));
+        return self::TABLE_MAP[$key] ?? null;
+    }
+
+    private function resolveTables(mixed $table): array
+    {
+        if (is_string($table) && trim($table) !== '') {
+            $resolved = $this->resolveTable($table);
+            return $resolved ? [$resolved] : [];
+        }
+
+        return array_values(array_unique(self::TABLE_MAP));
     }
 }

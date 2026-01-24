@@ -238,6 +238,7 @@ class InmuebleCaptadoController extends Controller
             ])
             ->where('ha.inmueble_id', $captado->inmueble_id)
             ->where('ha.usuario_id', $usuario->id)
+            ->whereNull('ha.deleted_at')
             ->orderByDesc('ha.fecha_accion')
             ->get();
 
@@ -278,6 +279,7 @@ class InmuebleCaptadoController extends Controller
                 'cap.id as captacion_id',
             ])
             ->where('ha.usuario_id', $usuario->id)
+            ->whereNull('ha.deleted_at')
             ->orderByDesc('ha.fecha_accion')
             ->limit($limit)
             ->get();

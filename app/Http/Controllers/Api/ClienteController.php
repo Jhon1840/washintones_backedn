@@ -176,6 +176,7 @@ class ClienteController extends Controller
                 DB::raw('MAX(ha.fecha_accion) as ultima_accion'),
             ])
             ->where('ha.cliente_id', $cliente->id)
+            ->whereNull('ha.deleted_at')
             ->groupBy('i.id', 'i.nombre', 'i.telefono', 'i.email')
             ->orderByDesc(DB::raw('MAX(ha.fecha_accion)'))
             ->limit(50)
