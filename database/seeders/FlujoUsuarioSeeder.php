@@ -35,7 +35,7 @@ class FlujoUsuarioSeeder extends Seeder
         $tipoCasa = $this->catalogId('catalogo_tipos_inmueble', 'Casa');
         $zonaNorte = $this->catalogId('catalogo_zonas', 'Norte');
         $operacionVenta = $this->catalogId('catalogo_operaciones', 'Venta');
-        $estadoActiva = $this->catalogId('catalogo_amc_estados', 'Activa');
+        $estadoSi = $this->catalogId('catalogo_amc_estados', 'Si');
         $monedaMxn = $this->catalogId('catalogo_monedas', 'MXN', 'codigo');
 
         $inmuebleId = $this->firstOrCreate('inmuebles', [
@@ -46,7 +46,7 @@ class FlujoUsuarioSeeder extends Seeder
             'tipo_id' => $tipoCasa,
             'zona_id' => $zonaNorte,
             'operacion_id' => $operacionVenta,
-            'amc_estado_id' => $estadoActiva,
+            'amc_estado_id' => $estadoSi,
             'valor_estimado' => 3200000,
             'moneda_id' => $monedaMxn,
             'created_at' => $now,

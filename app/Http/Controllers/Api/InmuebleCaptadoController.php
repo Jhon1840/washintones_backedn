@@ -290,6 +290,140 @@ class InmuebleCaptadoController extends Controller
         ]);
     }
 
+    public function historialPapelera(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+
+        $activeInmuebles = DB::table('inmuebles_captados_historial_acciones')
+            ->select('inmueble_id')
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at');
+
+        $rows = DB::table('inmuebles_captados_historial_acciones as ha')
+            ->join('inmuebles_captados_inmuebles as i', 'i.id', '=', 'ha.inmueble_id')
+            ->join('inmuebles_captados_registros as ic', 'ic.inmueble_id', '=', 'ha.inmueble_id')
+            ->leftJoin('inmuebles_captados_captaciones as cap', 'cap.id', '=', 'ic.captacion_id')
+            ->select([
+                'ha.id',
+                'ha.inmueble_id',
+                'ha.notas',
+                'ha.fecha_accion',
+                'ha.fecha_proxima_accion',
+                'i.direccion as inmueble',
+                'ic.estado',
+                'ic.id as inmueble_captado_id',
+                'cap.id as captacion_id',
+            ])
+            ->where('ha.usuario_id', $usuario->id)
+            ->whereNotNull('ha.deleted_at')
+            ->whereNotIn('ha.inmueble_id', $activeInmuebles)
+            ->orderByDesc('ha.fecha_accion')
+            ->orderByDesc('ha.id')
+            ->get();
+
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $captadoId = (int) ($row->inmueble_captado_id ?? 0);
+            if ($captadoId < 1) {
+                continue;
+            }
+
+            $entry = (array) $row;
+
+            if (! array_key_exists($captadoId, $groups)) {
+                $groups[$captadoId] = [
+                    'inmueble_captado_id' => $captadoId,
+                    'total_acciones' => 1,
+                    'latest' => $entry,
+                ];
+                continue;
+            }
+
+            $groups[$captadoId]['total_acciones'] += 1;
+            if ($this->isMoreRecentRow($row, $groups[$captadoId]['latest'])) {
+                $groups[$captadoId]['latest'] = $entry;
+            }
+        }
+
+        return response()->json([
+            'message' => 'Papelera de inmuebles captados recuperada.',
+            'data' => array_values($groups),
+        ]);
+    }
+
+    public function softDeleteHistorialGrupo(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $captadoId = (int) $request->input('inmueble_captado_id');
+
+        if ($captadoId < 1) {
+            return response()->json([
+                'message' => 'Inmueble captado inválido.',
+            ], 422);
+        }
+
+        $captado = DB::table('inmuebles_captados_registros as ic')
+            ->join('inmuebles_captados_inmuebles as i', 'i.id', '=', 'ic.inmueble_id')
+            ->join('inmuebles_captados_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->select(['ic.id', 'ic.inmueble_id', 'c.usuario_id'])
+            ->where('ic.id', $captadoId)
+            ->first();
+
+        if (! $captado || $captado->usuario_id !== $usuario->id) {
+            return response()->json([
+                'message' => 'Inmueble captado no encontrado.',
+            ], 404);
+        }
+
+        $updated = DB::table('inmuebles_captados_historial_acciones')
+            ->where('inmueble_id', $captado->inmueble_id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
+            ->update(['deleted_at' => now()]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial enviado a papelera.' : 'Historial no encontrado.',
+            'total' => $updated,
+        ]);
+    }
+
+    public function restoreHistorialGrupo(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $captadoId = (int) $request->input('inmueble_captado_id');
+
+        if ($captadoId < 1) {
+            return response()->json([
+                'message' => 'Inmueble captado inválido.',
+            ], 422);
+        }
+
+        $captado = DB::table('inmuebles_captados_registros as ic')
+            ->join('inmuebles_captados_inmuebles as i', 'i.id', '=', 'ic.inmueble_id')
+            ->join('inmuebles_captados_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->select(['ic.id', 'ic.inmueble_id', 'c.usuario_id'])
+            ->where('ic.id', $captadoId)
+            ->first();
+
+        if (! $captado || $captado->usuario_id !== $usuario->id) {
+            return response()->json([
+                'message' => 'Inmueble captado no encontrado.',
+            ], 404);
+        }
+
+        $updated = DB::table('inmuebles_captados_historial_acciones')
+            ->where('inmueble_id', $captado->inmueble_id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNotNull('deleted_at')
+            ->update(['deleted_at' => null]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial restaurado.' : 'Historial no encontrado.',
+            'total' => $updated,
+        ]);
+    }
+
     private function requireUsuario(Request $request): Usuario
     {
         $usuario = $this->tokens->resolveUserFromRequest($request);
@@ -301,5 +435,19 @@ class InmuebleCaptadoController extends Controller
         }
 
         return $usuario;
+    }
+
+    private function isMoreRecentRow(object $candidate, array $current): bool
+    {
+        $candidateDate = $candidate->fecha_accion ? strtotime($candidate->fecha_accion) : 0;
+        $currentDate = isset($current['fecha_accion'])
+            ? strtotime($current['fecha_accion'])
+            : 0;
+
+        if ($candidateDate === $currentDate) {
+            return ((int) $candidate->id) > ((int) ($current['id'] ?? 0));
+        }
+
+        return $candidateDate > $currentDate;
     }
 }

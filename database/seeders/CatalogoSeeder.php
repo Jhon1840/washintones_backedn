@@ -17,6 +17,8 @@ class CatalogoSeeder extends Seeder
             'Departamento',
             'Terreno',
             'Local comercial',
+            'Oficina',
+            'Galpon',
         ]);
 
         $this->seedSimpleCatalog('catalogo_zonas', [
@@ -32,9 +34,8 @@ class CatalogoSeeder extends Seeder
         ]);
 
         $this->seedSimpleCatalog('catalogo_amc_estados', [
-            'Prospecto',
-            'En analisis',
-            'Activa',
+            'Si',
+            'No',
         ]);
 
         $this->seedDocumentos();

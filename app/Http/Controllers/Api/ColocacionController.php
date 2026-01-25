@@ -92,18 +92,29 @@ class ColocacionController extends Controller
 
         $direccion = $data['inmueble_sugerido'] ?? ('Oportunidad ' . $cliente->nombre);
 
-        $inmueble = $this->resolver->resolveInmueble('colocacion_inmuebles', $cliente->id, $direccion, [
-            'descripcion' => $data['descripcion_busqueda'] ?? null,
-            'notas' => $data['notas'] ?? null,
-            'valor_estimado' => $data['presupuesto'] ?? null,
-            'operacion' => $data['operacion'] ?? null,
-            'tipo' => $data['tipo_inmueble'] ?? null,
-            'zona' => $data['zona'] ?? null,
-            'moneda' => $data['moneda'] ?? null,
-        ]);
+        $inmueble = $this->resolver->resolveInmueble(
+            'colocacion_inmuebles',
+            $cliente->id,
+            $direccion,
+            [
+                'descripcion' => $data['descripcion_busqueda'] ?? null,
+                'notas' => $data['notas'] ?? null,
+                'valor_estimado' => $data['presupuesto'] ?? null,
+                'operacion' => $data['operacion'] ?? null,
+                'tipo' => $data['tipo_inmueble'] ?? null,
+                'zona' => $data['zona'] ?? null,
+                'moneda' => $data['moneda'] ?? null,
+            ],
+            $usuario->id
+        );
 
         $operacionId = $this->resolver->catalogId('catalogo_operaciones', $data['operacion'] ?? null);
-        $tipoId = $this->resolver->catalogId('catalogo_tipos_inmueble', $data['tipo_inmueble'] ?? null);
+        $tipoId = $this->resolver->catalogId(
+            'catalogo_tipos_inmueble',
+            $data['tipo_inmueble'] ?? null,
+            'nombre',
+            $usuario->id
+        );
         $zonaId = $this->resolver->catalogId('catalogo_zonas', $data['zona'] ?? null);
         $monedaId = $this->resolver->catalogId('catalogo_monedas', $data['moneda'] ?? 'MXN', 'codigo');
 
@@ -333,6 +344,144 @@ class ColocacionController extends Controller
         ]);
     }
 
+    public function historialPapelera(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+
+        $activeInmuebles = DB::table('colocacion_historial_acciones')
+            ->select('inmueble_id')
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at');
+
+        $rows = DB::table('colocacion_historial_acciones as ha')
+            ->join('colocacion_registros as col', 'col.inmueble_id', '=', 'ha.inmueble_id')
+            ->join('colocacion_inmuebles as inm', 'inm.id', '=', 'ha.inmueble_id')
+            ->leftJoin('asesores as ase', 'ase.id', '=', 'col.asesor_id')
+            ->leftJoin('catalogo_estados_colocacion as est', 'est.id', '=', 'col.estado_id')
+            ->select([
+                'ha.id',
+                'ha.inmueble_id',
+                'ha.notas',
+                'ha.fecha_accion',
+                'ha.fecha_proxima_accion',
+                'col.id as colocacion_id',
+                'ase.nombre as asesor',
+                'est.nombre as estado',
+                'inm.direccion as inmueble',
+                'col.notas as colocacion_notas',
+            ])
+            ->where('ha.usuario_id', $usuario->id)
+            ->whereNotNull('ha.deleted_at')
+            ->whereNotIn('ha.inmueble_id', $activeInmuebles)
+            ->orderByDesc('ha.fecha_accion')
+            ->orderByDesc('ha.id')
+            ->get();
+
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $colocacionId = (int) ($row->colocacion_id ?? 0);
+            if ($colocacionId < 1) {
+                continue;
+            }
+
+            $entry = (array) $row;
+
+            if (! array_key_exists($colocacionId, $groups)) {
+                $groups[$colocacionId] = [
+                    'colocacion_id' => $colocacionId,
+                    'total_acciones' => 1,
+                    'latest' => $entry,
+                ];
+                continue;
+            }
+
+            $groups[$colocacionId]['total_acciones'] += 1;
+            if ($this->isMoreRecentRow($row, $groups[$colocacionId]['latest'])) {
+                $groups[$colocacionId]['latest'] = $entry;
+            }
+        }
+
+        return response()->json([
+            'message' => 'Papelera de colocación recuperada.',
+            'data' => array_values($groups),
+        ]);
+    }
+
+    public function softDeleteHistorialGrupo(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $colocacionId = (int) $request->input('colocacion_id');
+
+        if ($colocacionId < 1) {
+            return response()->json([
+                'message' => 'Colocación inválida.',
+            ], 422);
+        }
+
+        $colocacion = DB::table('colocacion_registros as col')
+            ->join('colocacion_inmuebles as i', 'i.id', '=', 'col.inmueble_id')
+            ->join('colocacion_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->select(['col.id', 'col.inmueble_id'])
+            ->where('c.usuario_id', $usuario->id)
+            ->where('col.id', $colocacionId)
+            ->first();
+
+        if (! $colocacion) {
+            return response()->json([
+                'message' => 'Colocación no encontrada.',
+            ], 404);
+        }
+
+        $updated = DB::table('colocacion_historial_acciones')
+            ->where('inmueble_id', $colocacion->inmueble_id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
+            ->update(['deleted_at' => now()]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial enviado a papelera.' : 'Historial no encontrado.',
+            'total' => $updated,
+        ]);
+    }
+
+    public function restoreHistorialGrupo(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $colocacionId = (int) $request->input('colocacion_id');
+
+        if ($colocacionId < 1) {
+            return response()->json([
+                'message' => 'Colocación inválida.',
+            ], 422);
+        }
+
+        $colocacion = DB::table('colocacion_registros as col')
+            ->join('colocacion_inmuebles as i', 'i.id', '=', 'col.inmueble_id')
+            ->join('colocacion_clientes as c', 'c.id', '=', 'i.cliente_id')
+            ->select(['col.id', 'col.inmueble_id'])
+            ->where('c.usuario_id', $usuario->id)
+            ->where('col.id', $colocacionId)
+            ->first();
+
+        if (! $colocacion) {
+            return response()->json([
+                'message' => 'Colocación no encontrada.',
+            ], 404);
+        }
+
+        $updated = DB::table('colocacion_historial_acciones')
+            ->where('inmueble_id', $colocacion->inmueble_id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNotNull('deleted_at')
+            ->update(['deleted_at' => null]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial restaurado.' : 'Historial no encontrado.',
+            'total' => $updated,
+        ]);
+    }
+
     private function accionesBaseQuery(?int $usuarioId = null)
     {
         $query = DB::table('colocacion_historial_acciones as ha')
@@ -350,6 +499,20 @@ class ColocacionController extends Controller
         }
 
         return $query;
+    }
+
+    private function isMoreRecentRow(object $candidate, array $current): bool
+    {
+        $candidateDate = $candidate->fecha_accion ? strtotime($candidate->fecha_accion) : 0;
+        $currentDate = isset($current['fecha_accion'])
+            ? strtotime($current['fecha_accion'])
+            : 0;
+
+        if ($candidateDate === $currentDate) {
+            return ((int) $candidate->id) > ((int) ($current['id'] ?? 0));
+        }
+
+        return $candidateDate > $currentDate;
     }
 
     private function requireUsuario(Request $request): Usuario

@@ -65,6 +65,9 @@ Route::apiResource('captaciones', CaptacionController::class)->except(['destroy'
 
 Route::get('inmuebles-captados/{id}/historial', [InmuebleCaptadoController::class, 'historial']);
 Route::get('inmuebles-captados/historial', [InmuebleCaptadoController::class, 'historialGlobal']);
+Route::get('inmuebles-captados/historial/papelera', [InmuebleCaptadoController::class, 'historialPapelera']);
+Route::post('inmuebles-captados/historial/soft-delete', [InmuebleCaptadoController::class, 'softDeleteHistorialGrupo']);
+Route::post('inmuebles-captados/historial/restore', [InmuebleCaptadoController::class, 'restoreHistorialGrupo']);
 Route::get('inmuebles-captados/clientes/search', [InmuebleCaptadoClienteController::class, 'search']);
 Route::get('inmuebles-captados/clientes/{id}/relaciones', [InmuebleCaptadoClienteController::class, 'relations']);
 Route::post('inmuebles-captados/clientes/{id}/inmuebles', [InmuebleCaptadoClienteController::class, 'storeInmueble']);
@@ -77,6 +80,9 @@ Route::delete('busquedas/inmuebles/{id}', [BusquedaController::class, 'detachInm
 
 Route::get('colocaciones/historial', [ColocacionController::class, 'historialGlobal']);
 Route::get('colocaciones/{id}/historial', [ColocacionController::class, 'historial']);
+Route::get('colocaciones/historial/papelera', [ColocacionController::class, 'historialPapelera']);
+Route::post('colocaciones/historial/soft-delete', [ColocacionController::class, 'softDeleteHistorialGrupo']);
+Route::post('colocaciones/historial/restore', [ColocacionController::class, 'restoreHistorialGrupo']);
 Route::get('colocaciones/clientes/search', [ColocacionClienteController::class, 'search']);
 Route::get('colocaciones/clientes/{id}/relaciones', [ColocacionClienteController::class, 'relations']);
 Route::post('colocaciones/clientes/{id}/inmuebles', [ColocacionClienteController::class, 'storeInmueble']);
@@ -87,6 +93,9 @@ Route::get('interesados/search', [InteresadoController::class, 'search']);
 Route::apiResource('interesados', InteresadoController::class)->except(['destroy']);
 
 Route::get('visitas/historial', [VisitaController::class, 'historialGlobal']);
+Route::get('visitas/historial/papelera', [VisitaController::class, 'historialPapelera']);
+Route::post('visitas/historial/soft-delete', [VisitaController::class, 'softDeleteHistorialGrupo']);
+Route::post('visitas/historial/restore', [VisitaController::class, 'restoreHistorialGrupo']);
 Route::get('visitas/{id}/acciones', [VisitaController::class, 'acciones']);
 Route::post('visitas/{id}/acciones', [VisitaController::class, 'storeAccion']);
 Route::put('visitas/acciones/{id}', [VisitaController::class, 'updateAccion']);
@@ -98,6 +107,9 @@ Route::apiResource('visitas', VisitaController::class)->except(['destroy']);
 
 Route::get('pasar-informacion/historial', [PasarInformacionController::class, 'historialGlobal']);
 Route::get('pasar-informacion/{id}/historial', [PasarInformacionController::class, 'historial']);
+Route::get('pasar-informacion/historial/papelera', [PasarInformacionController::class, 'historialPapelera']);
+Route::post('pasar-informacion/historial/soft-delete', [PasarInformacionController::class, 'softDeleteHistorialGrupo']);
+Route::post('pasar-informacion/historial/restore', [PasarInformacionController::class, 'restoreHistorialGrupo']);
 Route::get('pasar-informacion/clientes/search', [PasarInformacionClienteController::class, 'search']);
 Route::get('pasar-informacion/clientes/{id}/relaciones', [PasarInformacionClienteController::class, 'relations']);
 Route::post('pasar-informacion/clientes/{id}/inmuebles', [PasarInformacionClienteController::class, 'storeInmueble']);

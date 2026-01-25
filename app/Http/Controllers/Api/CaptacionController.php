@@ -76,13 +76,18 @@ class CaptacionController extends Controller
             $usuario->id
         );
 
-        $inmueble = $this->resolver->resolveInmueble($data['direccion'], $cliente, [
-            'descripcion' => $data['descripcion'] ?? null,
-            'notas' => $data['notas'] ?? null,
-            'valor_estimado' => $data['valor_estimado'] ?? null,
-            'tipo' => $data['tipo'] ?? null,
-            'estado_amc' => $data['estado_amc'] ?? null,
-        ]);
+        $inmueble = $this->resolver->resolveInmueble(
+            $data['direccion'],
+            $cliente,
+            [
+                'descripcion' => $data['descripcion'] ?? null,
+                'notas' => $data['notas'] ?? null,
+                'valor_estimado' => $data['valor_estimado'] ?? null,
+                'tipo' => $data['tipo'] ?? null,
+                'estado_amc' => $data['estado_amc'] ?? null,
+            ],
+            $usuario->id
+        );
 
         $captacion = Captacion::create([
             'cliente_id' => $cliente->id,

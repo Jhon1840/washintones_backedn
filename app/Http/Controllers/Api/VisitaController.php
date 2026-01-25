@@ -86,7 +86,8 @@ class VisitaController extends Controller
             'visitas_inmuebles',
             $cliente->id,
             $data['inmueble'] ?? ('Inmueble visita ' . $cliente->nombre),
-            ['descripcion' => $data['notas'] ?? null]
+            ['descripcion' => $data['notas'] ?? null],
+            $usuario->id
         );
 
         $interesado = $this->resolver->resolveInteresado(
@@ -251,6 +252,144 @@ class VisitaController extends Controller
         ]);
     }
 
+    public function historialPapelera(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+
+        $activeInmuebles = DB::table('visitas_historial_acciones')
+            ->select('inmueble_id')
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at');
+
+        $rows = DB::table('visitas_historial_acciones as ha')
+            ->join('visitas_registros as v', function ($join) {
+                $join->on('v.inmueble_id', '=', 'ha.inmueble_id')
+                    ->on('v.cliente_id', '=', 'ha.cliente_id');
+            })
+            ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
+            ->join('visitas_inmuebles as i', 'i.id', '=', 'v.inmueble_id')
+            ->select([
+                'ha.id',
+                'ha.inmueble_id',
+                'ha.notas',
+                'ha.fecha_accion',
+                'ha.fecha_proxima_accion',
+                'v.id as visita_id',
+                'v.estado',
+                'c.nombre as cliente',
+                'i.direccion as inmueble',
+            ])
+            ->where('ha.usuario_id', $usuario->id)
+            ->where('c.usuario_id', $usuario->id)
+            ->whereNotNull('ha.deleted_at')
+            ->whereNotIn('ha.inmueble_id', $activeInmuebles)
+            ->orderByDesc('ha.fecha_accion')
+            ->orderByDesc('ha.id')
+            ->get();
+
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $visitaId = (int) ($row->visita_id ?? 0);
+            if ($visitaId < 1) {
+                continue;
+            }
+
+            $entry = (array) $row;
+
+            if (! array_key_exists($visitaId, $groups)) {
+                $groups[$visitaId] = [
+                    'visita_id' => $visitaId,
+                    'total_acciones' => 1,
+                    'latest' => $entry,
+                ];
+                continue;
+            }
+
+            $groups[$visitaId]['total_acciones'] += 1;
+            if ($this->isMoreRecentRow($row, $groups[$visitaId]['latest'])) {
+                $groups[$visitaId]['latest'] = $entry;
+            }
+        }
+
+        return response()->json([
+            'message' => 'Papelera de visitas recuperada.',
+            'data' => array_values($groups),
+        ]);
+    }
+
+    public function softDeleteHistorialGrupo(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $visitaId = (int) $request->input('visita_id');
+
+        if ($visitaId < 1) {
+            return response()->json([
+                'message' => 'Visita inválida.',
+            ], 422);
+        }
+
+        $visita = DB::table('visitas_registros as v')
+            ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
+            ->select(['v.id', 'v.inmueble_id'])
+            ->where('c.usuario_id', $usuario->id)
+            ->where('v.id', $visitaId)
+            ->first();
+
+        if (! $visita) {
+            return response()->json([
+                'message' => 'Visita no encontrada.',
+            ], 404);
+        }
+
+        $updated = DB::table('visitas_historial_acciones')
+            ->where('inmueble_id', $visita->inmueble_id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
+            ->update(['deleted_at' => now()]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial enviado a papelera.' : 'Historial no encontrado.',
+            'total' => $updated,
+        ]);
+    }
+
+    public function restoreHistorialGrupo(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $visitaId = (int) $request->input('visita_id');
+
+        if ($visitaId < 1) {
+            return response()->json([
+                'message' => 'Visita inválida.',
+            ], 422);
+        }
+
+        $visita = DB::table('visitas_registros as v')
+            ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
+            ->select(['v.id', 'v.inmueble_id'])
+            ->where('c.usuario_id', $usuario->id)
+            ->where('v.id', $visitaId)
+            ->first();
+
+        if (! $visita) {
+            return response()->json([
+                'message' => 'Visita no encontrada.',
+            ], 404);
+        }
+
+        $updated = DB::table('visitas_historial_acciones')
+            ->where('inmueble_id', $visita->inmueble_id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNotNull('deleted_at')
+            ->update(['deleted_at' => null]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial restaurado.' : 'Historial no encontrado.',
+            'total' => $updated,
+        ]);
+    }
+
     public function acciones(Request $request, string $id): JsonResponse
     {
         $usuario = $this->requireUsuario($request);
@@ -368,6 +507,20 @@ class VisitaController extends Controller
         }
 
         return $usuario;
+    }
+
+    private function isMoreRecentRow(object $candidate, array $current): bool
+    {
+        $candidateDate = $candidate->fecha_accion ? strtotime($candidate->fecha_accion) : 0;
+        $currentDate = isset($current['fecha_accion'])
+            ? strtotime($current['fecha_accion'])
+            : 0;
+
+        if ($candidateDate === $currentDate) {
+            return ((int) $candidate->id) > ((int) ($current['id'] ?? 0));
+        }
+
+        return $candidateDate > $currentDate;
     }
 
     private function parseDateTime(?string $value): ?string

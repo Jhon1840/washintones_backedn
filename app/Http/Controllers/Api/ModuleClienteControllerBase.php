@@ -264,16 +264,22 @@ abstract class ModuleClienteControllerBase extends Controller
             'moneda' => ['nullable', 'string', 'max:10'],
         ]);
 
-        $inmueble = $this->resolver->resolveInmueble($this->inmueblesTable, $cliente->id, $data['direccion'], [
-            'descripcion' => $data['descripcion'] ?? null,
-            'notas' => $data['notas'] ?? null,
-            'valor_estimado' => $data['valor_estimado'] ?? null,
-            'tipo' => $data['tipo'] ?? null,
-            'zona' => $data['zona'] ?? null,
-            'operacion' => $data['operacion'] ?? null,
-            'estado_amc' => $data['estado_amc'] ?? null,
-            'moneda' => $data['moneda'] ?? null,
-        ]);
+        $inmueble = $this->resolver->resolveInmueble(
+            $this->inmueblesTable,
+            $cliente->id,
+            $data['direccion'],
+            [
+                'descripcion' => $data['descripcion'] ?? null,
+                'notas' => $data['notas'] ?? null,
+                'valor_estimado' => $data['valor_estimado'] ?? null,
+                'tipo' => $data['tipo'] ?? null,
+                'zona' => $data['zona'] ?? null,
+                'operacion' => $data['operacion'] ?? null,
+                'estado_amc' => $data['estado_amc'] ?? null,
+                'moneda' => $data['moneda'] ?? null,
+            ],
+            $usuario->id
+        );
 
         return response()->json([
             'message' => 'Inmueble creado correctamente.',

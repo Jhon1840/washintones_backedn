@@ -3,15 +3,36 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\AuthTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class CatalogoController extends Controller
 {
-    public function tiposInmueble(): JsonResponse
+    public function __construct(private readonly AuthTokenService $tokens)
     {
-        return $this->catalogoSimple('catalogo_tipos_inmueble');
+    }
+
+    public function tiposInmueble(Request $request): JsonResponse
+    {
+        $usuario = $this->tokens->resolveUserFromRequest($request);
+
+        $query = DB::table('catalogo_tipos_inmueble')->select(['id', 'nombre']);
+
+        if ($usuario) {
+            $query->where(function ($builder) use ($usuario) {
+                $builder->whereNull('usuario_id')
+                    ->orWhere('usuario_id', $usuario->id);
+            });
+        } else {
+            $query->whereNull('usuario_id');
+        }
+
+        return response()->json([
+            'message' => 'Catálogo recuperado.',
+            'data' => $query->orderBy('nombre')->get(),
+        ]);
     }
 
     public function zonas(): JsonResponse

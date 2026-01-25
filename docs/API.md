@@ -83,7 +83,7 @@ Devuelve los campos basicos (`id`, `nombre`, `email`, `telefono`, `activo`, `es_
 
 ## Catologos
 
-Estos endpoints devuelven la informacion necesaria para poblar formularios y validar relaciones. Actualmente regresan un mensaje placeholder hasta que el `CatalogoController` consulte la base.
+Estos endpoints devuelven la informacion necesaria para poblar formularios y validar relaciones.
 
 - `GET /api/catalogos/tipos-inmueble`
 - `GET /api/catalogos/zonas`
@@ -93,7 +93,11 @@ Estos endpoints devuelven la informacion necesaria para poblar formularios y val
 - `GET /api/catalogos/monedas`
 - `GET /api/catalogos/asesores`
 
-Los seeds (`CatalogoSeeder`) ya insertan datos para cada catalogo, por lo que solo falta exponerlos desde el controlador.
+Notas sobre tipos de inmueble:
+
+- `tipos-inmueble` mezcla valores globales + valores personalizados por usuario (requiere token).
+- Si el cliente envia un `tipo`/`tipo_inmueble` que no existe, el backend lo crea y lo asocia al usuario logeado.
+- Los tipos personalizados solo aparecen para ese usuario.
 
 ## Recursos principales
 
@@ -197,6 +201,9 @@ Payload tipico:
 - `GET /api/captaciones/proximas-acciones`
 - `GET /api/captaciones/{id}/historial`
 - `GET /api/captaciones/historial`
+- `GET /api/captaciones/historial/papelera`
+- `POST /api/captaciones/historial/soft-delete` (body: `captacion_id`)
+- `POST /api/captaciones/historial/restore` (body: `captacion_id`)
 
 `destroy` esta deshabilitado (`except(['destroy'])`).
 
@@ -215,6 +222,9 @@ Payload tipico:
 
 - `GET /api/colocaciones/{id}/historial`
 - `GET /api/colocaciones/historial`
+- `GET /api/colocaciones/historial/papelera`
+- `POST /api/colocaciones/historial/soft-delete` (body: `colocacion_id`)
+- `POST /api/colocaciones/historial/restore` (body: `colocacion_id`)
 
 ### Interesados
 
@@ -227,6 +237,9 @@ Payload tipico:
 - `POST /api/visitas/{id}/acciones`
 - `PUT /api/visitas/acciones/{id}`
 - `GET /api/visitas/historial`
+- `GET /api/visitas/historial/papelera`
+- `POST /api/visitas/historial/soft-delete` (body: `visita_id`)
+- `POST /api/visitas/historial/restore` (body: `visita_id`)
 
 ### Pasar informacion
 
@@ -234,6 +247,9 @@ Payload tipico:
 
 - `GET /api/pasar-informacion/{id}/historial`
 - `GET /api/pasar-informacion/historial`
+- `GET /api/pasar-informacion/historial/papelera`
+- `POST /api/pasar-informacion/historial/soft-delete` (body: `pasar_informacion_id`)
+- `POST /api/pasar-informacion/historial/restore` (body: `pasar_informacion_id`)
 
 ### Suscripciones
 
@@ -256,6 +272,10 @@ Campos: `usuario_id`, `plan_id`, `estado`, `precio_mensual`, `fecha_inicio`, `fe
 - `POST /api/inmuebles-captados`
 - `PUT/PATCH /api/inmuebles-captados/{id}`
 - `GET /api/inmuebles-captados/{id}/historial`
+- `GET /api/inmuebles-captados/historial`
+- `GET /api/inmuebles-captados/historial/papelera`
+- `POST /api/inmuebles-captados/historial/soft-delete` (body: `inmueble_captado_id`)
+- `POST /api/inmuebles-captados/historial/restore` (body: `inmueble_captado_id`)
 - `GET /api/historial`
 - `apiResource('tareas')->only(['index','store','update'])`
 - `GET /api/dashboard`

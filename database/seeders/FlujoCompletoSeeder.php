@@ -32,7 +32,7 @@ class FlujoCompletoSeeder extends Seeder
         $tipoDepartamento = $this->catalogId('catalogo_tipos_inmueble', 'Departamento');
         $zonaCentro = $this->catalogId('catalogo_zonas', 'Centro');
         $operacionVenta = $this->catalogId('catalogo_operaciones', 'Venta');
-        $estadoActiva = $this->catalogId('catalogo_amc_estados', 'Activa');
+        $estadoSi = $this->catalogId('catalogo_amc_estados', 'Si');
         $monedaMxn = $this->catalogId('catalogo_monedas', 'MXN', 'codigo');
 
         $inmuebleId = $this->firstOrCreate('inmuebles', [
@@ -43,7 +43,7 @@ class FlujoCompletoSeeder extends Seeder
             'tipo_id' => $tipoDepartamento,
             'zona_id' => $zonaCentro,
             'operacion_id' => $operacionVenta,
-            'amc_estado_id' => $estadoActiva,
+            'amc_estado_id' => $estadoSi,
             'valor_estimado' => 9850000,
             'moneda_id' => $monedaMxn,
             'created_at' => $now,

@@ -84,7 +84,8 @@ class PasarInformacionController extends Controller
             'pasar_informacion_inmuebles',
             $cliente->id,
             $data['inmueble_nombre'] ?? ('Propiedad de ' . $cliente->nombre),
-            ['descripcion' => $data['notas'] ?? null]
+            ['descripcion' => $data['notas'] ?? null],
+            $usuario->id
         );
 
         $interesado = $this->resolver->resolveInteresado(
@@ -279,6 +280,140 @@ class PasarInformacionController extends Controller
         ]);
     }
 
+    public function historialPapelera(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+
+        $activeInmuebles = DB::table('pasar_informacion_historial_acciones')
+            ->select('inmueble_id')
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at');
+
+        $rows = DB::table('pasar_informacion_historial_acciones as ha')
+            ->join('pasar_informacion_registros as pi', 'pi.inmueble_id', '=', 'ha.inmueble_id')
+            ->join('pasar_informacion_clientes as c', 'c.id', '=', 'pi.cliente_id')
+            ->join('pasar_informacion_inmuebles as i', 'i.id', '=', 'pi.inmueble_id')
+            ->select([
+                'ha.id',
+                'ha.inmueble_id',
+                'ha.notas',
+                'ha.fecha_accion',
+                'ha.fecha_proxima_accion',
+                'pi.id as pasar_informacion_id',
+                'pi.estado',
+                'c.nombre as cliente',
+                'i.direccion as inmueble',
+            ])
+            ->where('ha.usuario_id', $usuario->id)
+            ->whereNotNull('ha.deleted_at')
+            ->whereNotIn('ha.inmueble_id', $activeInmuebles)
+            ->orderByDesc('ha.fecha_accion')
+            ->orderByDesc('ha.id')
+            ->get();
+
+        $groups = [];
+
+        foreach ($rows as $row) {
+            $registroId = (int) ($row->pasar_informacion_id ?? 0);
+            if ($registroId < 1) {
+                continue;
+            }
+
+            $entry = (array) $row;
+
+            if (! array_key_exists($registroId, $groups)) {
+                $groups[$registroId] = [
+                    'pasar_informacion_id' => $registroId,
+                    'total_acciones' => 1,
+                    'latest' => $entry,
+                ];
+                continue;
+            }
+
+            $groups[$registroId]['total_acciones'] += 1;
+            if ($this->isMoreRecentRow($row, $groups[$registroId]['latest'])) {
+                $groups[$registroId]['latest'] = $entry;
+            }
+        }
+
+        return response()->json([
+            'message' => 'Papelera recuperada.',
+            'data' => array_values($groups),
+        ]);
+    }
+
+    public function softDeleteHistorialGrupo(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $registroId = (int) $request->input('pasar_informacion_id');
+
+        if ($registroId < 1) {
+            return response()->json([
+                'message' => 'Registro inválido.',
+            ], 422);
+        }
+
+        $registro = DB::table('pasar_informacion_registros as pi')
+            ->join('pasar_informacion_clientes as c', 'c.id', '=', 'pi.cliente_id')
+            ->select(['pi.id', 'pi.inmueble_id'])
+            ->where('pi.usuario_id', $usuario->id)
+            ->where('pi.id', $registroId)
+            ->first();
+
+        if (! $registro) {
+            return response()->json([
+                'message' => 'Registro no encontrado.',
+            ], 404);
+        }
+
+        $updated = DB::table('pasar_informacion_historial_acciones')
+            ->where('inmueble_id', $registro->inmueble_id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNull('deleted_at')
+            ->update(['deleted_at' => now()]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial enviado a papelera.' : 'Historial no encontrado.',
+            'total' => $updated,
+        ]);
+    }
+
+    public function restoreHistorialGrupo(Request $request): JsonResponse
+    {
+        $usuario = $this->requireUsuario($request);
+        $registroId = (int) $request->input('pasar_informacion_id');
+
+        if ($registroId < 1) {
+            return response()->json([
+                'message' => 'Registro inválido.',
+            ], 422);
+        }
+
+        $registro = DB::table('pasar_informacion_registros as pi')
+            ->join('pasar_informacion_clientes as c', 'c.id', '=', 'pi.cliente_id')
+            ->select(['pi.id', 'pi.inmueble_id'])
+            ->where('pi.usuario_id', $usuario->id)
+            ->where('pi.id', $registroId)
+            ->first();
+
+        if (! $registro) {
+            return response()->json([
+                'message' => 'Registro no encontrado.',
+            ], 404);
+        }
+
+        $updated = DB::table('pasar_informacion_historial_acciones')
+            ->where('inmueble_id', $registro->inmueble_id)
+            ->where('usuario_id', $usuario->id)
+            ->whereNotNull('deleted_at')
+            ->update(['deleted_at' => null]);
+
+        return response()->json([
+            'message' => $updated ? 'Historial restaurado.' : 'Historial no encontrado.',
+            'total' => $updated,
+        ]);
+    }
+
     private function requireUsuario(Request $request): Usuario
     {
         $usuario = $this->tokens->resolveUserFromRequest($request);
@@ -290,5 +425,19 @@ class PasarInformacionController extends Controller
         }
 
         return $usuario;
+    }
+
+    private function isMoreRecentRow(object $candidate, array $current): bool
+    {
+        $candidateDate = $candidate->fecha_accion ? strtotime($candidate->fecha_accion) : 0;
+        $currentDate = isset($current['fecha_accion'])
+            ? strtotime($current['fecha_accion'])
+            : 0;
+
+        if ($candidateDate === $currentDate) {
+            return ((int) $candidate->id) > ((int) ($current['id'] ?? 0));
+        }
+
+        return $candidateDate > $currentDate;
     }
 }

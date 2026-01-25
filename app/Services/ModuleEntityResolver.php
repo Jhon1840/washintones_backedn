@@ -48,7 +48,13 @@ class ModuleEntityResolver
         return DB::table($table)->where('id', $id)->first();
     }
 
-    public function resolveInmueble(string $table, int $clienteId, string $direccion, array $attributes = []): object
+    public function resolveInmueble(
+        string $table,
+        int $clienteId,
+        string $direccion,
+        array $attributes = [],
+        ?int $usuarioId = null
+    ): object
     {
         $direccion = trim($direccion);
 
@@ -68,7 +74,12 @@ class ModuleEntityResolver
         $descripcion = trim((string) ($attributes['descripcion'] ?? $attributes['notas'] ?? ''));
         $valor = $this->parseAmount($attributes['valor_estimado'] ?? null);
 
-        $tipoId = $attributes['tipo_id'] ?? $this->catalogId('catalogo_tipos_inmueble', $attributes['tipo'] ?? null);
+        $tipoId = $attributes['tipo_id'] ?? $this->catalogId(
+            'catalogo_tipos_inmueble',
+            $attributes['tipo'] ?? null,
+            'nombre',
+            $usuarioId
+        );
         $zonaId = $attributes['zona_id'] ?? $this->catalogId('catalogo_zonas', $attributes['zona'] ?? null);
         $operacionId = $attributes['operacion_id'] ?? $this->catalogId('catalogo_operaciones', $attributes['operacion'] ?? null);
         $estadoId = $attributes['amc_estado_id'] ?? $this->catalogId('catalogo_amc_estados', $attributes['estado_amc'] ?? null);
@@ -290,7 +301,12 @@ class ModuleEntityResolver
         return null;
     }
 
-    public function catalogId(string $table, ?string $value = null, string $column = 'nombre'): int
+    public function catalogId(
+        string $table,
+        ?string $value = null,
+        string $column = 'nombre',
+        ?int $usuarioId = null
+    ): int
     {
         $value = $value !== null ? trim($value) : null;
 
@@ -298,6 +314,25 @@ class ModuleEntityResolver
             $prepared = $column === 'codigo'
                 ? Str::upper($value)
                 : Str::lower($value);
+
+            if ($table === 'catalogo_tipos_inmueble' && $usuarioId !== null && $column === 'nombre') {
+                $id = DB::table($table)
+                    ->whereRaw('LOWER(' . $column . ') = ?', [$prepared])
+                    ->where(function ($builder) use ($usuarioId) {
+                        $builder->whereNull('usuario_id')
+                            ->orWhere('usuario_id', $usuarioId);
+                    })
+                    ->value('id');
+
+                if ($id) {
+                    return (int) $id;
+                }
+
+                return (int) DB::table($table)->insertGetId([
+                    'nombre' => $value,
+                    'usuario_id' => $usuarioId,
+                ]);
+            }
 
             $query = DB::table($table);
 

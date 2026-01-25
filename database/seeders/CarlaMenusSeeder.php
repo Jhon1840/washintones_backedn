@@ -25,7 +25,7 @@ class CarlaMenusSeeder extends Seeder
         $zonaNorte = $this->catalogId('catalogo_zonas', 'Norte');
         $operacionVenta = $this->catalogId('catalogo_operaciones', 'Venta');
         $operacionRenta = $this->catalogId('catalogo_operaciones', 'Renta');
-        $estadoActiva = $this->catalogId('catalogo_amc_estados', 'Activa');
+        $estadoSi = $this->catalogId('catalogo_amc_estados', 'Si');
         $monedaMxn = $this->catalogId('catalogo_monedas', 'MXN', 'codigo');
         $etapaCaptacion = $this->catalogId('catalogo_etapas', 'Captacion');
         $etapaPromocion = $this->catalogId('catalogo_etapas', 'Promocion');
@@ -107,7 +107,7 @@ class CarlaMenusSeeder extends Seeder
             'tipo_id' => $tipoCasa,
             'zona_id' => $zonaCentro,
             'operacion_id' => $operacionVenta,
-            'amc_estado_id' => $estadoActiva,
+            'amc_estado_id' => $estadoSi,
             'valor_estimado' => 2400000,
             'moneda_id' => $monedaMxn,
             'created_at' => $now,
@@ -161,7 +161,7 @@ class CarlaMenusSeeder extends Seeder
             'tipo_id' => $tipoDepto,
             'zona_id' => $zonaNorte,
             'operacion_id' => $operacionRenta,
-            'amc_estado_id' => $estadoActiva,
+            'amc_estado_id' => $estadoSi,
             'valor_estimado' => 18000,
             'moneda_id' => $monedaMxn,
             'created_at' => $now,
@@ -235,7 +235,7 @@ class CarlaMenusSeeder extends Seeder
             'tipo_id' => $tipoCasa,
             'zona_id' => $zonaCentro,
             'operacion_id' => $operacionVenta,
-            'amc_estado_id' => $estadoActiva,
+            'amc_estado_id' => $estadoSi,
             'valor_estimado' => 3100000,
             'moneda_id' => $monedaMxn,
             'created_at' => $now,
@@ -299,7 +299,7 @@ class CarlaMenusSeeder extends Seeder
             'tipo_id' => $tipoDepto,
             'zona_id' => $zonaCentro,
             'operacion_id' => $operacionVenta,
-            'amc_estado_id' => $estadoActiva,
+            'amc_estado_id' => $estadoSi,
             'valor_estimado' => 1500000,
             'moneda_id' => $monedaMxn,
             'created_at' => $now,
@@ -352,7 +352,7 @@ class CarlaMenusSeeder extends Seeder
             'tipo_id' => $tipoCasa,
             'zona_id' => $zonaNorte,
             'operacion_id' => $operacionVenta,
-            'amc_estado_id' => $estadoActiva,
+            'amc_estado_id' => $estadoSi,
             'valor_estimado' => 2750000,
             'moneda_id' => $monedaMxn,
             'created_at' => $now,
