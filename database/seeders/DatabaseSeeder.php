@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
             CarlaNotificacionTareaSeeder::class,
         ]);
 
-        User::factory()->firstOrCreate(
+        User::firstOrCreate(
             ['email' => 'test@example.com'],
             ['name' => 'Test User']
         );
