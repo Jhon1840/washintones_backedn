@@ -72,20 +72,56 @@ class CatalogoSeeder extends Seeder
     private function seedEtapasYAcciones(): void
     {
         $this->seedSimpleCatalog('catalogo_etapas', [
-            'Captacion',
-            'Promocion',
+            'Captación',
+            'Colocación',
+            'Visita',
+            'Pasar Información',
+            'Promoción',
             'Cierre',
+            'Inmuebles Captados',
         ]);
 
         $etapas = DB::table('catalogo_etapas')->pluck('id', 'nombre')->all();
 
         DB::table('catalogo_acciones')->insert([
-            ['etapa_id' => $etapas['Captacion'], 'nombre' => 'Contacto inicial'],
-            ['etapa_id' => $etapas['Captacion'], 'nombre' => 'Evaluacion de documentacion'],
-            ['etapa_id' => $etapas['Promocion'], 'nombre' => 'Publicacion en portales'],
-            ['etapa_id' => $etapas['Promocion'], 'nombre' => 'Visita programada'],
-            ['etapa_id' => $etapas['Cierre'], 'nombre' => 'Presentacion de oferta'],
-            ['etapa_id' => $etapas['Cierre'], 'nombre' => 'Firma de contrato'],
+            // Captación
+            ['etapa_id' => $etapas['Captación'], 'nombre' => 'Llamar'],
+            ['etapa_id' => $etapas['Captación'], 'nombre' => 'Gestionar Reunión'],
+            ['etapa_id' => $etapas['Captación'], 'nombre' => 'Visitar el inmueble'],
+            ['etapa_id' => $etapas['Captación'], 'nombre' => 'Toma de fotografía'],
+            ['etapa_id' => $etapas['Captación'], 'nombre' => 'Pedir la documentación'],
+            ['etapa_id' => $etapas['Captación'], 'nombre' => 'Hacer el AMC'],
+            ['etapa_id' => $etapas['Captación'], 'nombre' => 'Elaboración de contrato'],
+            ['etapa_id' => $etapas['Captación'], 'nombre' => 'Firma de contrato'],
+            ['etapa_id' => $etapas['Captación'], 'nombre' => 'Subir al sistema'],
+
+            // Colocación
+            ['etapa_id' => $etapas['Colocación'], 'nombre' => 'Buscar inmueble'],
+            ['etapa_id' => $etapas['Colocación'], 'nombre' => 'Preguntar disponibilidad'],
+            ['etapa_id' => $etapas['Colocación'], 'nombre' => 'Pasar información'],
+            ['etapa_id' => $etapas['Colocación'], 'nombre' => 'Llamada de seguimiento'],
+            ['etapa_id' => $etapas['Colocación'], 'nombre' => 'Agendar visita'],
+            ['etapa_id' => $etapas['Colocación'], 'nombre' => 'Elaboración de contrato'],
+            ['etapa_id' => $etapas['Colocación'], 'nombre' => 'Notaría'],
+            ['etapa_id' => $etapas['Colocación'], 'nombre' => 'Levantar inventario'],
+
+            // Pasar Información
+            ['etapa_id' => $etapas['Pasar Información'], 'nombre' => 'Pasar la información'],
+            ['etapa_id' => $etapas['Pasar Información'], 'nombre' => 'Llamada de seguimiento'],
+            ['etapa_id' => $etapas['Pasar Información'], 'nombre' => 'Llamada de confirmación de recepción'],
+
+            // Visita
+            ['etapa_id' => $etapas['Visita'], 'nombre' => 'Enviar información y ubicación'],
+            ['etapa_id' => $etapas['Visita'], 'nombre' => 'Confirmar visita'],
+            ['etapa_id' => $etapas['Visita'], 'nombre' => 'Llamada de seguimiento'],
+
+            // Inmuebles Captados
+            ['etapa_id' => $etapas['Inmuebles Captados'], 'nombre' => 'Elaboración y edición de fotos y videos'],
+            ['etapa_id' => $etapas['Inmuebles Captados'], 'nombre' => 'Subir al sistema'],
+            ['etapa_id' => $etapas['Inmuebles Captados'], 'nombre' => 'Publicar en Marketplace'],
+            ['etapa_id' => $etapas['Inmuebles Captados'], 'nombre' => 'Promocionar en Meta'],
+            ['etapa_id' => $etapas['Inmuebles Captados'], 'nombre' => 'Hacer el arte y descripción'],
+            ['etapa_id' => $etapas['Inmuebles Captados'], 'nombre' => 'Subir a los grupos de Whatsapp'],
         ]);
     }
 

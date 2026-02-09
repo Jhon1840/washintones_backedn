@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
 {
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
         $totalUsuarios = DB::table('usuarios')->count();
         $today = now()->toDateString();
@@ -23,8 +24,15 @@ class AdminDashboardController extends Controller
         $gananciasMes = (float) $suscripcionesActivas->sum('precio_mensual');
         $gananciasAnio = $gananciasMes * 12;
 
-        $inicioSemana = now()->subDays(6)->startOfDay();
-        $finSemana = now()->endOfDay();
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+
+        $inicioSemana = $dateFrom
+            ? now()->parse($dateFrom)->startOfDay()
+            : now()->subDays(6)->startOfDay();
+        $finSemana = $dateTo
+            ? now()->parse($dateTo)->endOfDay()
+            : now()->endOfDay();
 
         $totalesSemana = DB::table('suscripciones')
             ->whereBetween('fecha_inicio', [$inicioSemana->toDateString(), $finSemana->toDateString()])
@@ -33,13 +41,14 @@ class AdminDashboardController extends Controller
             ->pluck('total', 'fecha');
 
         $serieSemanal = [];
-        $labels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+        $days = $inicioSemana->diffInDays($finSemana) + 1;
+        $days = max(1, min($days, 62));
 
-        for ($i = 0; $i < 7; $i++) {
+        for ($i = 0; $i < $days; $i++) {
             $fecha = $inicioSemana->copy()->addDays($i);
             $key = $fecha->toDateString();
             $total = (float) ($totalesSemana[$key] ?? 0);
-            $label = $labels[$fecha->dayOfWeekIso - 1];
+            $label = $fecha->format('d/m');
 
             $serieSemanal[] = [
                 'fecha' => $key,

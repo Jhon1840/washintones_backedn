@@ -40,8 +40,21 @@ Route::prefix('catalogos')->group(function () {
     Route::get('operaciones', [CatalogoController::class, 'operaciones']);
     Route::get('estados-amc', [CatalogoController::class, 'estadosAmc']);
     Route::get('acciones', [CatalogoController::class, 'acciones']);
+    Route::get('acciones-captacion', [CatalogoController::class, 'accionesCaptacion']);
+    Route::get('acciones-colocacion', [CatalogoController::class, 'accionesColocacion']);
+    Route::get('acciones-visitas', [CatalogoController::class, 'accionesVisitas']);
+    Route::get('acciones-pasar-informacion', [CatalogoController::class, 'accionesPasarInformacion']);
+    Route::get('acciones-inmuebles-captados', [CatalogoController::class, 'accionesInmueblesCaptados']);
+    Route::get('acciones_inmuebles_captados', [CatalogoController::class, 'accionesInmueblesCaptados']);
     Route::get('monedas', [CatalogoController::class, 'monedas']);
     Route::get('asesores', [CatalogoController::class, 'asesores']);
+
+    Route::post('acciones-captacion', [CatalogoController::class, 'storeAccionCaptacion']);
+    Route::post('acciones-colocacion', [CatalogoController::class, 'storeAccionColocacion']);
+    Route::post('acciones-visitas', [CatalogoController::class, 'storeAccionVisitas']);
+    Route::post('acciones-pasar-informacion', [CatalogoController::class, 'storeAccionPasarInformacion']);
+    Route::post('acciones-inmuebles-captados', [CatalogoController::class, 'storeAccionInmueblesCaptados']);
+    Route::post('acciones_inmuebles_captados', [CatalogoController::class, 'storeAccionInmueblesCaptados']);
 });
 
 Route::get('clientes/search', [ClienteController::class, 'search']);
@@ -68,6 +81,8 @@ Route::get('inmuebles-captados/historial', [InmuebleCaptadoController::class, 'h
 Route::get('inmuebles-captados/historial/papelera', [InmuebleCaptadoController::class, 'historialPapelera']);
 Route::post('inmuebles-captados/historial/soft-delete', [InmuebleCaptadoController::class, 'softDeleteHistorialGrupo']);
 Route::post('inmuebles-captados/historial/restore', [InmuebleCaptadoController::class, 'restoreHistorialGrupo']);
+Route::get('inmuebles-captados/catalogos/acciones', [CatalogoController::class, 'accionesInmueblesCaptados']);
+Route::get('inmuebles-captados/acciones', [CatalogoController::class, 'accionesInmueblesCaptados']);
 Route::get('inmuebles-captados/clientes/search', [InmuebleCaptadoClienteController::class, 'search']);
 Route::get('inmuebles-captados/clientes/{id}/relaciones', [InmuebleCaptadoClienteController::class, 'relations']);
 Route::post('inmuebles-captados/clientes/{id}/inmuebles', [InmuebleCaptadoClienteController::class, 'storeInmueble']);

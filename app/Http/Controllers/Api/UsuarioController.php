@@ -15,8 +15,25 @@ class UsuarioController extends Controller
     {
         $usuarios = Usuario::query()
             ->select(['id', 'nombre', 'email', 'telefono', 'activo', 'es_admin'])
+            ->with(['suscripciones' => function ($query) {
+                $query->orderByDesc('fecha_inicio')->orderByDesc('id');
+            }])
             ->orderBy('nombre')
-            ->get();
+            ->get()
+            ->map(function (Usuario $usuario) {
+                $suscripcion = $usuario->suscripciones->first();
+
+                return [
+                    'id' => $usuario->id,
+                    'nombre' => $usuario->nombre,
+                    'email' => $usuario->email,
+                    'telefono' => $usuario->telefono,
+                    'activo' => (bool) $usuario->activo,
+                    'es_admin' => (bool) $usuario->es_admin,
+                    'fecha_inicio' => $suscripcion?->fecha_inicio?->toDateString(),
+                    'fecha_fin' => $suscripcion?->fecha_fin?->toDateString(),
+                ];
+            });
 
         return response()->json([
             'message' => 'Usuarios recuperados.',
@@ -105,10 +122,11 @@ class UsuarioController extends Controller
             ], 404);
         }
 
-        $usuario->delete();
+        $usuario->activo = false;
+        $usuario->save();
 
         return response()->json([
-            'message' => 'Usuario eliminado.',
+            'message' => 'Usuario inactivado.',
         ]);
     }
 
