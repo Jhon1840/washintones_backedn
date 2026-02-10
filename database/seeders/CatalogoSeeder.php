@@ -85,6 +85,7 @@ class CatalogoSeeder extends Seeder
 
         DB::table('catalogo_acciones')->insert([
             // Captación
+            ['etapa_id' => $etapas['Captación'], 'nombre' => 'Contacto inicial'],
             ['etapa_id' => $etapas['Captación'], 'nombre' => 'Llamar'],
             ['etapa_id' => $etapas['Captación'], 'nombre' => 'Gestionar Reunión'],
             ['etapa_id' => $etapas['Captación'], 'nombre' => 'Visitar el inmueble'],

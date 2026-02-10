@@ -76,6 +76,7 @@ class NormalizeCatalogoAccionesSeeder extends Seeder
     {
         $canonical = [
             'Captación' => [
+                'Contacto inicial',
                 'Llamar',
                 'Gestionar Reunión',
                 'Visitar el inmueble',
