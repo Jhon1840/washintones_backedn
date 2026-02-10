@@ -10,6 +10,7 @@ services:
     volumes:
       - .:/var/www/html
     environment:
+      DB_CONNECTION: mysql
       DB_HOST: db
       DB_PORT: 3306
       DB_DATABASE: crm_freddy
@@ -19,7 +20,10 @@ services:
       db:
         condition: service_healthy
     command: >
-      bash -lc "composer install --no-interaction --prefer-dist
+      bash -lc "if [ ! -f .env ]; then cp .env.example .env; fi
+      && if ! grep -q '^APP_KEY=' .env || grep -q '^APP_KEY=$' .env; then php artisan key:generate --force; fi
+      && composer install --no-interaction --prefer-dist
+      && php artisan config:clear
       && php artisan migrate --force
       && apache2-foreground"
 
