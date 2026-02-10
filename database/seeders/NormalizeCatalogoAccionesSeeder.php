@@ -106,6 +106,9 @@ class NormalizeCatalogoAccionesSeeder extends Seeder
                 'Confirmar visita',
                 'Llamada de seguimiento',
             ],
+            'Promoción' => [
+                'Visita programada',
+            ],
             'Inmuebles Captados' => [
                 'Elaboración y edición de fotos y videos',
                 'Subir al sistema',

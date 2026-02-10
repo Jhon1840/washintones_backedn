@@ -115,6 +115,9 @@ class CatalogoSeeder extends Seeder
             ['etapa_id' => $etapas['Visita'], 'nombre' => 'Confirmar visita'],
             ['etapa_id' => $etapas['Visita'], 'nombre' => 'Llamada de seguimiento'],
 
+            // Promoción
+            ['etapa_id' => $etapas['Promoción'], 'nombre' => 'Visita programada'],
+
             // Inmuebles Captados
             ['etapa_id' => $etapas['Inmuebles Captados'], 'nombre' => 'Elaboración y edición de fotos y videos'],
             ['etapa_id' => $etapas['Inmuebles Captados'], 'nombre' => 'Subir al sistema'],
