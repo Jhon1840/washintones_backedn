@@ -150,11 +150,22 @@ class ClienteController extends Controller
             ], 404);
         }
 
-        $inmuebles = DB::table('inmuebles')
-            ->select(['id', 'direccion', 'descripcion'])
-            ->where('cliente_id', $cliente->id)
-            ->orderByDesc('updated_at')
-            ->orderByDesc('id')
+        $inmuebles = DB::table('inmuebles as i')
+            ->leftJoin('catalogo_tipos_inmueble as cti', 'cti.id', '=', 'i.tipo_id')
+            ->leftJoin('catalogo_amc_estados as cae', 'cae.id', '=', 'i.amc_estado_id')
+            ->select([
+                'i.id',
+                'i.direccion',
+                'i.descripcion',
+                'i.tipo_id',
+                'i.amc_estado_id',
+                'i.valor_estimado',
+                'cti.nombre as tipo_nombre',
+                'cae.nombre as estado_amc_nombre',
+            ])
+            ->where('i.cliente_id', $cliente->id)
+            ->orderByDesc('i.updated_at')
+            ->orderByDesc('i.id')
             ->limit(50)
             ->get()
             ->map(function ($row) {
@@ -163,6 +174,13 @@ class ClienteController extends Controller
                     'nombre' => $row->direccion ?? 'Inmueble sin nombre',
                     'direccion' => $row->direccion ?? '—',
                     'descripcion' => $row->descripcion,
+                    'tipo_id' => $row->tipo_id !== null ? (int) $row->tipo_id : null,
+                    'tipo' => $row->tipo_nombre,
+                    'valor' => $row->valor_estimado,
+                    'valor_estimado' => $row->valor_estimado,
+                    'amc_estado_id' => $row->amc_estado_id !== null ? (int) $row->amc_estado_id : null,
+                    'amc' => $row->estado_amc_nombre,
+                    'estado_amc' => $row->estado_amc_nombre,
                 ];
             });
 

@@ -54,6 +54,50 @@ class CaptacionController extends Controller
     {
         $usuario = $this->requireUsuario($request);
 
+        $coalesce = function (array $keys) use ($request) {
+            foreach ($keys as $key) {
+                if (! $request->exists($key)) {
+                    continue;
+                }
+
+                $value = $request->input($key);
+
+                if (is_string($value)) {
+                    $value = trim($value);
+                    if ($value === '' || strtolower($value) === 'null') {
+                        continue;
+                    }
+
+                    return $value;
+                }
+
+                if ($value !== null) {
+                    return $value;
+                }
+            }
+
+            return null;
+        };
+
+        $normalized = array_filter([
+            'cliente_nombre' => $coalesce(['cliente_nombre', 'cliente', 'nombre', 'interesado']),
+            'telefono' => $coalesce(['telefono']),
+            'correo' => $coalesce(['correo', 'email']),
+            'direccion' => $coalesce(['direccion', 'direccion_inmueble']),
+            'tipo' => $coalesce(['tipo', 'tipo_inmueble']),
+            'valor_estimado' => $coalesce(['valor_estimado', 'valor']),
+            'estado_amc' => $coalesce(['estado_amc', 'amc', 'etapa']),
+            'proxima_accion' => $coalesce(['proxima_accion', 'accion']),
+            'descripcion' => $coalesce(['descripcion', 'descripcion_inmueble', 'inmueble_descripcion', 'detalle_inmueble']),
+            'notas' => $coalesce(['notas', 'observaciones', 'comentarios', 'nota']),
+            'fecha_proxima_accion' => $coalesce(['fecha_proxima_accion']),
+            'fecha_inicio' => $coalesce(['fecha_inicio', 'fecha_accion']),
+        ], static fn ($value) => $value !== null);
+
+        if ($normalized !== []) {
+            $request->merge($normalized);
+        }
+
         $data = $request->validate([
             'cliente_nombre' => ['required', 'string', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
@@ -102,7 +146,7 @@ class CaptacionController extends Controller
         $this->resolver->registerHistorialAccion($cliente, $inmueble, $usuario->id, [
             'etapa' => 'Captacion',
             'accion' => $data['proxima_accion'] ?? null,
-            'notas' => $data['descripcion'] ?? $data['notas'] ?? null,
+            'notas' => $data['notas'] ?? null,
             'fecha_accion' => $captacion->fecha_inicio?->toDateString(),
             'fecha_proxima_accion' => $data['fecha_proxima_accion'] ?? null,
             'interesado_nombre' => $data['cliente_nombre'],
@@ -196,9 +240,9 @@ class CaptacionController extends Controller
         $clienteId = $captacion?->cliente_id;
 
         if ($captacion && $captacion->usuario_id !== $usuario->id) {
-            return response()->json([
-                'message' => 'Captación no encontrada.',
-            ], 404);
+            // Permite resolver por historial_id cuando hay colision numerica con una captacion ajena.
+            $captacion = null;
+            $clienteId = null;
         }
 
         if ($clienteId) {
@@ -449,6 +493,7 @@ class CaptacionController extends Controller
             'ha.inmueble_id',
             'c.nombre as cliente',
             'i.direccion as inmueble',
+            'i.descripcion as descripcion',
             'ce.nombre as etapa',
             'ca.nombre as accion',
             'ha.notas',

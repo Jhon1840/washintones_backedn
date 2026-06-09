@@ -112,6 +112,9 @@ class SuscripcionController extends Controller
         $fechaInicio = $data['fecha_inicio'] ?? ($suscripcion->fecha_inicio?->toDateString() ?? now()->toDateString());
         $fechaFin = $this->resolveFechaFin($plan, $fechaInicio);
         $precio = $this->resolvePrecioMensual($plan, $data['precio_mensual'] ?? null, $suscripcion->precio_mensual);
+        $estado = array_key_exists('estado', $data)
+            ? $data['estado']
+            : $this->resolveEstadoByFechaFin($fechaFin);
 
         if ($precio === null) {
             return response()->json([
@@ -122,7 +125,7 @@ class SuscripcionController extends Controller
         $suscripcion->fill([
             'usuario_id' => $data['usuario_id'] ?? $suscripcion->usuario_id,
             'plan_id' => $planId,
-            'estado' => $data['estado'] ?? $suscripcion->estado,
+            'estado' => $estado,
             'precio_mensual' => $precio,
             'fecha_inicio' => $fechaInicio,
             'fecha_fin' => $fechaFin,
@@ -168,5 +171,16 @@ class SuscripcionController extends Controller
         }
 
         return (float) $plan->precio;
+    }
+
+    private function resolveEstadoByFechaFin(?string $fechaFin): string
+    {
+        if ($fechaFin === null) {
+            return 'activa';
+        }
+
+        return Carbon::parse($fechaFin)->isBefore(now()->startOfDay())
+            ? 'inactiva'
+            : 'activa';
     }
 }

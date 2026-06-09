@@ -68,15 +68,15 @@ class ColocacionController extends Controller
             'cliente_nombre' => ['required', 'string', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
             'correo' => ['nullable', 'email', 'max:255'],
-            'descripcion_busqueda' => ['nullable', 'string'],
+            'descripcion' => ['nullable', 'string'],
             'operacion' => ['nullable', 'string', 'max:120'],
             'tipo_inmueble' => ['nullable', 'string', 'max:120'],
             'zona' => ['nullable', 'string', 'max:120'],
             'presupuesto' => ['nullable'],
             'moneda' => ['nullable', 'string', 'max:10'],
-            'inmueble_sugerido' => ['nullable', 'string', 'max:255'],
-            'asesor_nombre' => ['nullable', 'string', 'max:255'],
-            'asesor_telefono' => ['nullable', 'string', 'max:50'],
+            'inmueble' => ['nullable', 'string', 'max:255'],
+            'asesor' => ['nullable', 'string', 'max:255'],
+            'telefono_asesor' => ['nullable', 'string', 'max:50'],
             'notas' => ['nullable', 'string'],
             'proxima_accion' => ['nullable', 'string', 'max:255'],
             'fecha_proxima_accion' => ['nullable', 'string'],
@@ -90,14 +90,14 @@ class ColocacionController extends Controller
             $usuario->id
         );
 
-        $direccion = $data['inmueble_sugerido'] ?? ('Oportunidad ' . $cliente->nombre);
+        $direccion = $data['inmueble'] ?? ('Oportunidad ' . $cliente->nombre);
 
         $inmueble = $this->resolver->resolveInmueble(
             'colocacion_inmuebles',
             $cliente->id,
             $direccion,
             [
-                'descripcion' => $data['descripcion_busqueda'] ?? null,
+                'descripcion' => $data['descripcion'] ?? null,
                 'notas' => $data['notas'] ?? null,
                 'valor_estimado' => $data['presupuesto'] ?? null,
                 'operacion' => $data['operacion'] ?? null,
@@ -130,10 +130,10 @@ class ColocacionController extends Controller
             $inmueble->id
         );
 
-        $asesorNombre = $data['asesor_nombre'] ?? $usuario->nombre;
+        $asesorNombre = $data['asesor'] ?? $usuario->nombre;
         $asesor = $this->resolver->resolveAsesor(
             $asesorNombre,
-            $data['asesor_telefono'] ?? null,
+            $data['telefono_asesor'] ?? null,
             $data['correo'] ?? null
         );
 
@@ -164,7 +164,7 @@ class ColocacionController extends Controller
             'interesado_telefono' => $data['telefono'] ?? null,
             'interesado_email' => $data['correo'] ?? null,
             'asesor_nombre' => $asesorNombre,
-            'asesor_telefono' => $data['asesor_telefono'] ?? null,
+            'asesor_telefono' => $data['telefono_asesor'] ?? null,
         ]);
 
         return response()->json([

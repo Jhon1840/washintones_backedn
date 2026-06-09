@@ -22,6 +22,13 @@ class UsuarioController extends Controller
             ->get()
             ->map(function (Usuario $usuario) {
                 $suscripcion = $usuario->suscripciones->first();
+                $hoy = now()->toDateString();
+                $suscripcionVencida = $suscripcion?->fecha_fin !== null
+                    && $suscripcion->fecha_fin->toDateString() < $hoy;
+                if ($suscripcion && $suscripcionVencida && strtolower((string) $suscripcion->estado) !== 'inactiva') {
+                    $suscripcion->estado = 'inactiva';
+                    $suscripcion->save();
+                }
 
                 return [
                     'id' => $usuario->id,
@@ -30,8 +37,14 @@ class UsuarioController extends Controller
                     'telefono' => $usuario->telefono,
                     'activo' => (bool) $usuario->activo,
                     'es_admin' => (bool) $usuario->es_admin,
+                    'suscripcion_id' => $suscripcion?->id,
+                    'suscripcion_estado' => $suscripcion?->estado,
                     'fecha_inicio' => $suscripcion?->fecha_inicio?->toDateString(),
                     'fecha_fin' => $suscripcion?->fecha_fin?->toDateString(),
+                    'suscripcion_vencida' => $suscripcionVencida,
+                    'suscripcion_mensaje' => $suscripcionVencida
+                        ? 'La suscripcion esta vencida.'
+                        : null,
                 ];
             });
 

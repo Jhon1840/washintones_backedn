@@ -28,6 +28,7 @@ class VisitaController extends Controller
         $visitas = DB::table('visitas_registros as v')
             ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
             ->join('visitas_inmuebles as i', 'i.id', '=', 'v.inmueble_id')
+            ->leftJoin('asesores as a', 'a.id', '=', 'v.asesor_id')
             ->select([
                 'v.id',
                 'c.nombre as cliente',
@@ -35,6 +36,7 @@ class VisitaController extends Controller
                 'v.estado',
                 'v.fecha',
                 'v.notas',
+                'a.nombre as asesor',
             ])
             ->where('c.usuario_id', $usuario->id)
             ->orderByDesc('v.fecha')
@@ -49,6 +51,7 @@ class VisitaController extends Controller
                 'estado' => $row->estado,
                 'fecha' => $row->fecha,
                 'notas' => $row->notas,
+                'asesor' => $row->asesor,
             ];
         });
 
@@ -63,24 +66,45 @@ class VisitaController extends Controller
         $usuario = $this->requireUsuario($request);
 
         $data = $request->validate([
-            'cliente_nombre' => ['required', 'string', 'max:255'],
+            'cliente_id' => ['nullable', 'integer'],
+            'cliente_nombre' => ['nullable', 'string', 'max:255'],
             'inmueble' => ['nullable', 'string', 'max:255'],
             'interesado_nombre' => ['required', 'string', 'max:255'],
             'telefono' => ['nullable', 'string', 'max:50'],
             'asesor' => ['nullable', 'string', 'max:255'],
+            'tiene_asesor' => ['nullable'],
             'notas' => ['nullable', 'string'],
             'proxima_accion' => ['nullable', 'string', 'max:255'],
             'fecha_contacto' => ['nullable', 'string'],
             'fecha_proxima_accion' => ['nullable', 'string'],
+            'id' => ['nullable'],
         ]);
 
-        $cliente = $this->resolver->resolveCliente(
-            'visitas_clientes',
-            $data['cliente_nombre'],
-            $data['telefono'] ?? null,
-            null,
-            $usuario->id
-        );
+        $cliente = null;
+
+        if (! empty($data['cliente_id'])) {
+            $cliente = DB::table('visitas_clientes')
+                ->where('usuario_id', $usuario->id)
+                ->where('id', (int) $data['cliente_id'])
+                ->first();
+        }
+
+        if (! $cliente) {
+            $clienteNombre = trim((string) ($data['cliente_nombre'] ?? ''));
+            if ($clienteNombre === '') {
+                return response()->json([
+                    'message' => 'cliente_nombre es requerido cuando cliente_id no existe o no es valido.',
+                ], 422);
+            }
+
+            $cliente = $this->resolver->resolveCliente(
+                'visitas_clientes',
+                $clienteNombre,
+                $data['telefono'] ?? null,
+                null,
+                $usuario->id
+            );
+        }
 
         $inmueble = $this->resolver->resolveInmueble(
             'visitas_inmuebles',
@@ -97,10 +121,18 @@ class VisitaController extends Controller
         );
 
         $fecha = $this->parseDateTime($data['fecha_contacto'] ?? null) ?? now()->toDateTimeString();
+        $tieneAsesor = filter_var($data['tiene_asesor'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        $asesorNombre = trim((string) ($data['asesor'] ?? ''));
+        $asesor = null;
+
+        if ($tieneAsesor !== false && $asesorNombre !== '') {
+            $asesor = $this->resolver->resolveAsesor($asesorNombre);
+        }
 
         $visitaId = DB::table('visitas_registros')->insertGetId([
             'inmueble_id' => $inmueble->id,
             'cliente_id' => $cliente->id,
+            'asesor_id' => $asesor?->id,
             'fecha' => $fecha,
             'estado' => 'Programada',
             'notas' => $data['notas'] ?? null,
@@ -127,7 +159,7 @@ class VisitaController extends Controller
             'fecha_proxima_accion' => $data['fecha_proxima_accion'] ?? null,
             'interesado_nombre' => $interesado->nombre,
             'interesado_telefono' => $interesado->telefono,
-            'asesor_nombre' => $data['asesor'] ?? null,
+            'asesor_nombre' => $asesor?->nombre,
         ]);
 
         return response()->json([
@@ -147,6 +179,7 @@ class VisitaController extends Controller
         $visita = DB::table('visitas_registros as v')
             ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
             ->join('visitas_inmuebles as i', 'i.id', '=', 'v.inmueble_id')
+            ->leftJoin('asesores as a', 'a.id', '=', 'v.asesor_id')
             ->select([
                 'v.id',
                 'c.nombre as cliente',
@@ -154,6 +187,7 @@ class VisitaController extends Controller
                 'v.estado',
                 'v.fecha',
                 'v.notas',
+                'a.nombre as asesor',
             ])
             ->where('c.usuario_id', $usuario->id)
             ->where('v.id', $id)
@@ -174,6 +208,7 @@ class VisitaController extends Controller
                 'estado' => $visita->estado,
                 'fecha' => $visita->fecha,
                 'notas' => $visita->notas,
+                'asesor' => $visita->asesor,
             ],
         ]);
     }
