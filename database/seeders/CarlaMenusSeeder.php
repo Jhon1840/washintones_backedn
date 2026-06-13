@@ -246,6 +246,7 @@ class CarlaMenusSeeder extends Seeder
         $visitaId = $this->firstOrCreate('visitas_registros', [
             'inmueble_id' => $inmuebleVisId,
             'cliente_id' => $clienteVisId,
+            'interesado_id' => $interesadoVisId,
             'fecha' => $visitaFecha->toDateTimeString(),
         ], [
             'estado' => 'Agendada',

@@ -28,11 +28,17 @@ class VisitaController extends Controller
         $visitas = DB::table('visitas_registros as v')
             ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
             ->join('visitas_inmuebles as i', 'i.id', '=', 'v.inmueble_id')
+            ->leftJoin('interesados as interes', 'interes.id', '=', 'v.interesado_id')
             ->leftJoin('asesores as a', 'a.id', '=', 'v.asesor_id')
             ->select([
                 'v.id',
+                'v.cliente_id',
+                'v.inmueble_id',
+                'v.interesado_id',
                 'c.nombre as cliente',
                 'i.direccion as inmueble',
+                'interes.nombre as contacto',
+                'interes.telefono as contacto_telefono',
                 'v.estado',
                 'v.fecha',
                 'v.notas',
@@ -46,8 +52,13 @@ class VisitaController extends Controller
         $items = $visitas->map(function ($row) {
             return [
                 'id' => $row->id,
+                'cliente_id' => $row->cliente_id,
+                'inmueble_id' => $row->inmueble_id,
+                'interesado_id' => $row->interesado_id,
                 'cliente' => $row->cliente ?? '—',
                 'inmueble' => $row->inmueble ?? '—',
+                'contacto' => $row->contacto,
+                'contacto_telefono' => $row->contacto_telefono,
                 'estado' => $row->estado,
                 'fecha' => $row->fecha,
                 'notas' => $row->notas,
@@ -132,6 +143,7 @@ class VisitaController extends Controller
         $visitaId = DB::table('visitas_registros')->insertGetId([
             'inmueble_id' => $inmueble->id,
             'cliente_id' => $cliente->id,
+            'interesado_id' => $interesado->id,
             'asesor_id' => $asesor?->id,
             'fecha' => $fecha,
             'estado' => 'Programada',
@@ -179,11 +191,18 @@ class VisitaController extends Controller
         $visita = DB::table('visitas_registros as v')
             ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
             ->join('visitas_inmuebles as i', 'i.id', '=', 'v.inmueble_id')
+            ->leftJoin('interesados as interes', 'interes.id', '=', 'v.interesado_id')
             ->leftJoin('asesores as a', 'a.id', '=', 'v.asesor_id')
             ->select([
                 'v.id',
+                'v.cliente_id',
+                'v.inmueble_id',
+                'v.interesado_id',
                 'c.nombre as cliente',
+                'c.telefono as cliente_telefono',
                 'i.direccion as inmueble',
+                'interes.nombre as contacto',
+                'interes.telefono as contacto_telefono',
                 'v.estado',
                 'v.fecha',
                 'v.notas',
@@ -203,8 +222,14 @@ class VisitaController extends Controller
             'message' => 'Detalle recuperado.',
             'data' => [
                 'id' => $visita->id,
+                'cliente_id' => $visita->cliente_id,
+                'inmueble_id' => $visita->inmueble_id,
+                'interesado_id' => $visita->interesado_id,
                 'cliente' => $visita->cliente ?? '—',
+                'cliente_telefono' => $visita->cliente_telefono,
                 'inmueble' => $visita->inmueble ?? '—',
+                'contacto' => $visita->contacto,
+                'contacto_telefono' => $visita->contacto_telefono,
                 'estado' => $visita->estado,
                 'fecha' => $visita->fecha,
                 'notas' => $visita->notas,
@@ -260,26 +285,46 @@ class VisitaController extends Controller
         $usuario = $this->requireUsuario($request);
         $limit = (int) $request->query('limit', 200);
         $limit = max(1, min($limit, 1000));
+        $page = max((int) $request->query('page', 1), 1);
 
         $acciones = DB::table('visitas_acciones as va')
             ->join('visitas_registros as v', 'v.id', '=', 'va.visita_id')
             ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
             ->join('visitas_inmuebles as i', 'i.id', '=', 'v.inmueble_id')
+            ->leftJoin('interesados as interes', 'interes.id', '=', 'v.interesado_id')
             ->select([
                 'va.id',
                 'va.visita_id',
+                'v.cliente_id',
+                'v.inmueble_id',
+                'v.interesado_id',
                 'va.descripcion',
                 'va.fecha',
                 'va.created_at',
                 'c.nombre as cliente',
-                'c.telefono as telefono',
+                'c.telefono as cliente_telefono',
                 'i.direccion as inmueble',
+                'interes.nombre as contacto',
+                'interes.telefono as contacto_telefono',
             ])
             ->where('va.usuario_id', $usuario->id)
             ->where('c.usuario_id', $usuario->id)
+            ->whereExists(function ($query) use ($usuario) {
+                $query->selectRaw('1')
+                    ->from('visitas_historial_acciones as ha')
+                    ->whereColumn('ha.cliente_id', 'v.cliente_id')
+                    ->whereColumn('ha.inmueble_id', 'v.inmueble_id')
+                    ->where('ha.usuario_id', $usuario->id)
+                    ->whereNull('ha.deleted_at')
+                    ->where(function ($contactQuery) {
+                        $contactQuery
+                            ->whereColumn('ha.interesado_id', 'v.interesado_id')
+                            ->orWhereNull('v.interesado_id');
+                    });
+            })
             ->orderByDesc('va.fecha')
-            ->limit($limit)
-            ->get();
+            ->orderByDesc('va.id')
+            ->paginate($limit, ['*'], 'page', $page);
 
         return response()->json([
             'message' => 'Historial global de visitas recuperado.',
@@ -291,33 +336,43 @@ class VisitaController extends Controller
     {
         $usuario = $this->requireUsuario($request);
 
-        $activeInmuebles = DB::table('visitas_historial_acciones')
-            ->select('inmueble_id')
-            ->where('usuario_id', $usuario->id)
-            ->whereNull('deleted_at');
-
         $rows = DB::table('visitas_historial_acciones as ha')
             ->join('visitas_registros as v', function ($join) {
                 $join->on('v.inmueble_id', '=', 'ha.inmueble_id')
-                    ->on('v.cliente_id', '=', 'ha.cliente_id');
+                    ->on('v.cliente_id', '=', 'ha.cliente_id')
+                    ->on('v.interesado_id', '=', 'ha.interesado_id');
             })
             ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
             ->join('visitas_inmuebles as i', 'i.id', '=', 'v.inmueble_id')
+            ->join('interesados as interes', 'interes.id', '=', 'ha.interesado_id')
             ->select([
                 'ha.id',
+                'ha.cliente_id',
                 'ha.inmueble_id',
+                'ha.interesado_id',
                 'ha.notas',
                 'ha.fecha_accion',
                 'ha.fecha_proxima_accion',
                 'v.id as visita_id',
                 'v.estado',
                 'c.nombre as cliente',
+                'c.telefono as cliente_telefono',
                 'i.direccion as inmueble',
+                'interes.nombre as contacto',
+                'interes.telefono as contacto_telefono',
             ])
             ->where('ha.usuario_id', $usuario->id)
             ->where('c.usuario_id', $usuario->id)
             ->whereNotNull('ha.deleted_at')
-            ->whereNotIn('ha.inmueble_id', $activeInmuebles)
+            ->whereNotExists(function ($query) use ($usuario) {
+                $query->selectRaw('1')
+                    ->from('visitas_historial_acciones as active')
+                    ->whereColumn('active.cliente_id', 'ha.cliente_id')
+                    ->whereColumn('active.inmueble_id', 'ha.inmueble_id')
+                    ->whereColumn('active.interesado_id', 'ha.interesado_id')
+                    ->where('active.usuario_id', $usuario->id)
+                    ->whereNull('active.deleted_at');
+            })
             ->orderByDesc('ha.fecha_accion')
             ->orderByDesc('ha.id')
             ->get();
@@ -366,7 +421,7 @@ class VisitaController extends Controller
 
         $visita = DB::table('visitas_registros as v')
             ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
-            ->select(['v.id', 'v.inmueble_id'])
+            ->select(['v.id', 'v.cliente_id', 'v.inmueble_id', 'v.interesado_id'])
             ->where('c.usuario_id', $usuario->id)
             ->where('v.id', $visitaId)
             ->first();
@@ -378,8 +433,12 @@ class VisitaController extends Controller
         }
 
         $updated = DB::table('visitas_historial_acciones')
+            ->where('cliente_id', $visita->cliente_id)
             ->where('inmueble_id', $visita->inmueble_id)
             ->where('usuario_id', $usuario->id)
+            ->when($visita->interesado_id, function ($query, $interesadoId) {
+                $query->where('interesado_id', $interesadoId);
+            })
             ->whereNull('deleted_at')
             ->update(['deleted_at' => now()]);
 
@@ -402,7 +461,7 @@ class VisitaController extends Controller
 
         $visita = DB::table('visitas_registros as v')
             ->join('visitas_clientes as c', 'c.id', '=', 'v.cliente_id')
-            ->select(['v.id', 'v.inmueble_id'])
+            ->select(['v.id', 'v.cliente_id', 'v.inmueble_id', 'v.interesado_id'])
             ->where('c.usuario_id', $usuario->id)
             ->where('v.id', $visitaId)
             ->first();
@@ -414,8 +473,12 @@ class VisitaController extends Controller
         }
 
         $updated = DB::table('visitas_historial_acciones')
+            ->where('cliente_id', $visita->cliente_id)
             ->where('inmueble_id', $visita->inmueble_id)
             ->where('usuario_id', $usuario->id)
+            ->when($visita->interesado_id, function ($query, $interesadoId) {
+                $query->where('interesado_id', $interesadoId);
+            })
             ->whereNotNull('deleted_at')
             ->update(['deleted_at' => null]);
 

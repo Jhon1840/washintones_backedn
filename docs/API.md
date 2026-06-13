@@ -241,6 +241,12 @@ Payload tipico:
 - `POST /api/visitas/historial/soft-delete` (body: `visita_id`)
 - `POST /api/visitas/historial/restore` (body: `visita_id`)
 
+El historial global devuelve datos paginados y conserva la jerarquia mediante
+`cliente_id`, `inmueble_id` e `interesado_id`. Cada elemento incluye tambien
+`cliente`, `cliente_telefono`, `inmueble`, `contacto` y `contacto_telefono`.
+La papelera y la restauracion por `visita_id` operan sobre el contacto asociado
+a esa visita, sin ocultar los otros contactos del mismo inmueble.
+
 ### Pasar informacion
 
 `apiResource('pasar-informacion')->except(['destroy'])` mas:
