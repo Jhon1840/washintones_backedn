@@ -31,6 +31,13 @@ class ClienteController extends Controller
         $clientes = Cliente::query()
             ->select(['id', 'nombre', 'telefono', 'email', 'created_at'])
             ->where('usuario_id', $usuario->id)
+            ->whereExists(function ($query) use ($usuario) {
+                $query->select(DB::raw(1))
+                    ->from('historial_acciones as ha')
+                    ->whereColumn('ha.cliente_id', 'clientes.id')
+                    ->where('ha.usuario_id', $usuario->id)
+                    ->whereNull('ha.deleted_at');
+            })
             ->orderBy('nombre')
             ->limit($limit)
             ->get();
@@ -164,6 +171,13 @@ class ClienteController extends Controller
                 'cae.nombre as estado_amc_nombre',
             ])
             ->where('i.cliente_id', $cliente->id)
+            ->whereExists(function ($query) use ($usuario) {
+                $query->select(DB::raw(1))
+                    ->from('historial_acciones as ha')
+                    ->whereColumn('ha.inmueble_id', 'i.id')
+                    ->where('ha.usuario_id', $usuario->id)
+                    ->whereNull('ha.deleted_at');
+            })
             ->orderByDesc('i.updated_at')
             ->orderByDesc('i.id')
             ->limit(50)
