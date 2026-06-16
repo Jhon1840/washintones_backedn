@@ -14,6 +14,31 @@ class ColocacionClienteController extends ModuleClienteControllerBase
     protected string $inmueblesTable = 'colocacion_inmuebles';
     protected string $historialTable = 'colocacion_historial_acciones';
 
+    public function index(Request $request): JsonResponse
+    {
+        $limit = max((int) $request->query('limit', 50), 1);
+        $usuario = $this->requireUsuario($request);
+
+        $clientes = DB::table($this->clientesTable . ' as c')
+            ->select(['c.id', 'c.nombre', 'c.telefono', 'c.email', 'c.created_at'])
+            ->where('c.usuario_id', $usuario->id)
+            ->whereExists(function ($query) use ($usuario) {
+                $query->select(DB::raw(1))
+                    ->from($this->historialTable . ' as ha')
+                    ->whereColumn('ha.cliente_id', 'c.id')
+                    ->where('ha.usuario_id', $usuario->id)
+                    ->whereNull('ha.deleted_at');
+            })
+            ->orderBy('c.nombre')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'message' => 'Clientes recuperados.',
+            'data' => $clientes,
+        ]);
+    }
+
     public function relations(Request $request, string $id): JsonResponse
     {
         $usuario = $this->requireUsuario($request);
@@ -55,6 +80,13 @@ class ColocacionClienteController extends ModuleClienteControllerBase
                 'a.email as asesor_email',
             ])
             ->where('ci.cliente_id', $cliente->id)
+            ->whereExists(function ($query) use ($usuario) {
+                $query->select(DB::raw(1))
+                    ->from($this->historialTable . ' as ha')
+                    ->whereColumn('ha.inmueble_id', 'ci.id')
+                    ->where('ha.usuario_id', $usuario->id)
+                    ->whereNull('ha.deleted_at');
+            })
             ->orderByDesc('ci.updated_at')
             ->orderByDesc('ci.id')
             ->limit(50)
